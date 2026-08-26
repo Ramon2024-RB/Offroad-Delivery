@@ -2,6 +2,12 @@ import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
+enum DeliveryRoute {
+  none,
+  safe,
+  risk,
+}
+
 class OffroadDeliveryGame extends FlameGame {
   static const double worldWidth = 3200;
   static const double groundHeight = 110;
@@ -22,14 +28,26 @@ class OffroadDeliveryGame extends FlameGame {
 
   late final RectangleComponent cargo;
 
+  late final RectangleComponent routeMarker;
+  late final TextComponent routeMarkerLabel;
+
   final ValueNotifier<String> missionNotifier =
       ValueNotifier<String>('Auftrag: Paket beim Depot abholen');
+
+  final ValueNotifier<bool> routeChoiceNotifier =
+      ValueNotifier<bool>(false);
+
+  final ValueNotifier<String> routeNotifier =
+      ValueNotifier<String>('Keine Route gewählt');
 
   double _speed = 0;
   double _throttle = 0;
 
   bool _cargoLoaded = false;
   bool _missionCompleted = false;
+  bool _routeChoiceShown = false;
+
+  DeliveryRoute _selectedRoute = DeliveryRoute.none;
 
   static const double _acceleration = 420;
   static const double _brakingAcceleration = 600;
@@ -37,6 +55,8 @@ class OffroadDeliveryGame extends FlameGame {
 
   static const double _maximumForwardSpeed = 500;
   static const double _maximumReverseSpeed = -180;
+
+  static const double _routeChoiceX = 1450;
 
   @override
   Color backgroundColor() {
@@ -48,7 +68,6 @@ class OffroadDeliveryGame extends FlameGame {
     await super.onLoad();
 
     gameWorld = World();
-
     add(gameWorld);
 
     camera = CameraComponent.withFixedResolution(
@@ -130,6 +149,34 @@ class OffroadDeliveryGame extends FlameGame {
       ),
     );
 
+    routeMarker = RectangleComponent(
+      position: Vector2(
+        _routeChoiceX,
+        groundY - 70,
+      ),
+      size: Vector2(
+        12,
+        70,
+      ),
+      paint: Paint()
+        ..color = const Color(0xFFFFC107),
+    );
+
+    routeMarkerLabel = TextComponent(
+      text: 'ROUTENWAHL',
+      position: Vector2(
+        _routeChoiceX - 50,
+        groundY - 100,
+      ),
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+
     vanBody = RectangleComponent(
       position: Vector2(
         185,
@@ -182,6 +229,8 @@ class OffroadDeliveryGame extends FlameGame {
       depotLabel,
       customer,
       customerLabel,
+      routeMarker,
+      routeMarkerLabel,
       cargo,
       vanBody,
       rearWheel,
@@ -196,14 +245,49 @@ class OffroadDeliveryGame extends FlameGame {
   }
 
   void setThrottle(double value) {
+    if (_routeChoiceShown || _missionCompleted) {
+      _throttle = 0;
+      return;
+    }
+
     _throttle = value.clamp(-1.0, 1.0);
+  }
+
+  void selectSafeRoute() {
+    if (!_routeChoiceShown) {
+      return;
+    }
+
+    _selectedRoute = DeliveryRoute.safe;
+    _routeChoiceShown = false;
+
+    routeChoiceNotifier.value = false;
+    routeNotifier.value = 'Sichere Route • Belohnung ×1,0';
+
+    missionNotifier.value =
+        'Sichere Route gewählt – bringe die Lieferung zum Kunden!';
+  }
+
+  void selectRiskRoute() {
+    if (!_routeChoiceShown) {
+      return;
+    }
+
+    _selectedRoute = DeliveryRoute.risk;
+    _routeChoiceShown = false;
+
+    routeChoiceNotifier.value = false;
+    routeNotifier.value = 'Risikoroute • Belohnung ×1,5';
+
+    missionNotifier.value =
+        'Risikoroute gewählt – erhöhte Belohnung!';
   }
 
   @override
   void update(double dt) {
     super.update(dt);
 
-    if (_missionCompleted) {
+    if (_missionCompleted || _routeChoiceShown) {
       _applyFriction(dt);
     } else if (_throttle > 0) {
       _speed += _acceleration * _throttle * dt;
@@ -220,9 +304,7 @@ class OffroadDeliveryGame extends FlameGame {
 
     final double movement = _speed * dt;
 
-    vanBody.position.x += movement;
-    rearWheel.position.x += movement;
-    frontWheel.position.x += movement;
+    _moveVehicle(movement);
 
     if (_cargoLoaded) {
       cargo.position = Vector2(
@@ -233,6 +315,7 @@ class OffroadDeliveryGame extends FlameGame {
 
     _keepVehicleInsideWorld();
     _checkMission();
+    _checkRouteChoice();
   }
 
   void _checkMission() {
@@ -249,8 +332,31 @@ class OffroadDeliveryGame extends FlameGame {
       _missionCompleted = true;
       _throttle = 0;
 
+      final int reward =
+          _selectedRoute == DeliveryRoute.risk ? 150 : 100;
+
       missionNotifier.value =
-          'LIEFERUNG ERFOLGREICH! +100 €';
+          'LIEFERUNG ERFOLGREICH! +$reward €';
+    }
+  }
+
+  void _checkRouteChoice() {
+    if (!_cargoLoaded ||
+        _missionCompleted ||
+        _routeChoiceShown ||
+        _selectedRoute != DeliveryRoute.none) {
+      return;
+    }
+
+    if (vanBody.position.x >= _routeChoiceX - 180) {
+      _routeChoiceShown = true;
+      _throttle = 0;
+      _speed = 0;
+
+      routeChoiceNotifier.value = true;
+
+      missionNotifier.value =
+          'ROUTENWAHL – welchen Weg möchtest du nehmen?';
     }
   }
 
@@ -304,6 +410,9 @@ class OffroadDeliveryGame extends FlameGame {
   @override
   void onRemove() {
     missionNotifier.dispose();
+    routeChoiceNotifier.dispose();
+    routeNotifier.dispose();
+
     super.onRemove();
   }
 }

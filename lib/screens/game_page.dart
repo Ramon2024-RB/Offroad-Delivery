@@ -43,7 +43,6 @@ class _GamePageState extends State<GamePage> {
             ),
           ),
 
-          // Zurück-Button
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -61,7 +60,6 @@ class _GamePageState extends State<GamePage> {
             ),
           ),
 
-          // Festes Missions-HUD
           SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
@@ -104,7 +102,85 @@ class _GamePageState extends State<GamePage> {
             ),
           ),
 
-          // Bremse / Rückwärts
+          ValueListenableBuilder<bool>(
+            valueListenable: _game.routeChoiceNotifier,
+            builder: (context, showRouteChoice, _) {
+              if (!showRouteChoice) {
+                return const SizedBox.shrink();
+              }
+
+              return Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(
+                    alpha: 0.55,
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 520,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF172014),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.white24,
+                          width: 2,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'ROUTENWAHL',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Wie möchtest du die Lieferung fortsetzen?',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _RouteButton(
+                                  title: 'SICHERE ROUTE',
+                                  description:
+                                      'Normaler Weg\nBelohnung ×1,0',
+                                  icon: Icons.route_rounded,
+                                  onPressed: _game.selectSafeRoute,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _RouteButton(
+                                  title: 'RISIKOROUTE',
+                                  description:
+                                      'Schwerer Weg\nBelohnung ×1,5',
+                                  icon:
+                                      Icons.warning_amber_rounded,
+                                  onPressed: _game.selectRiskRoute,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
           Positioned(
             left: 30,
             bottom: 25,
@@ -116,7 +192,6 @@ class _GamePageState extends State<GamePage> {
             ),
           ),
 
-          // Gas
           Positioned(
             right: 30,
             bottom: 25,
@@ -125,6 +200,57 @@ class _GamePageState extends State<GamePage> {
               label: 'GAS',
               onPressed: _startGas,
               onReleased: _releasePedal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteButton extends StatelessWidget {
+  const _RouteButton({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String title;
+  final String description;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 30,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            description,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
             ),
           ),
         ],

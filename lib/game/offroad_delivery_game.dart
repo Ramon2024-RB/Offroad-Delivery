@@ -3,6 +3,11 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 class OffroadDeliveryGame extends FlameGame {
+  static const double worldWidth = 3200;
+  static const double groundHeight = 110;
+
+  late final World gameWorld;
+
   late final RectangleComponent ground;
 
   late final RectangleComponent vanBody;
@@ -14,9 +19,11 @@ class OffroadDeliveryGame extends FlameGame {
 
   late final TextComponent depotLabel;
   late final TextComponent customerLabel;
-  late final TextComponent missionText;
 
   late final RectangleComponent cargo;
+
+  final ValueNotifier<String> missionNotifier =
+      ValueNotifier<String>('Auftrag: Paket beim Depot abholen');
 
   double _speed = 0;
   double _throttle = 0;
@@ -40,14 +47,28 @@ class OffroadDeliveryGame extends FlameGame {
   Future<void> onLoad() async {
     await super.onLoad();
 
+    gameWorld = World();
+
+    add(gameWorld);
+
+    camera = CameraComponent.withFixedResolution(
+      world: gameWorld,
+      width: 900,
+      height: 400,
+    );
+
+    add(camera);
+
+    const double groundY = 300;
+
     ground = RectangleComponent(
       position: Vector2(
         0,
-        size.y * 0.72,
+        groundY,
       ),
       size: Vector2(
-        size.x,
-        size.y * 0.28,
+        worldWidth,
+        groundHeight,
       ),
       paint: Paint()
         ..color = const Color(0xFF4D6B35),
@@ -55,35 +76,22 @@ class OffroadDeliveryGame extends FlameGame {
 
     depot = RectangleComponent(
       position: Vector2(
-        35,
-        size.y * 0.72 - 100,
+        60,
+        groundY - 100,
       ),
       size: Vector2(
-        90,
+        100,
         100,
       ),
       paint: Paint()
         ..color = const Color(0xFF56616A),
     );
 
-    customer = RectangleComponent(
-      position: Vector2(
-        size.x - 130,
-        size.y * 0.72 - 90,
-      ),
-      size: Vector2(
-        90,
-        90,
-      ),
-      paint: Paint()
-        ..color = const Color(0xFFB66A45),
-    );
-
     depotLabel = TextComponent(
       text: 'DEPOT',
       position: Vector2(
-        48,
-        size.y * 0.72 - 125,
+        78,
+        groundY - 130,
       ),
       textRenderer: TextPaint(
         style: const TextStyle(
@@ -94,11 +102,24 @@ class OffroadDeliveryGame extends FlameGame {
       ),
     );
 
+    customer = RectangleComponent(
+      position: Vector2(
+        worldWidth - 180,
+        groundY - 90,
+      ),
+      size: Vector2(
+        100,
+        90,
+      ),
+      paint: Paint()
+        ..color = const Color(0xFFB66A45),
+    );
+
     customerLabel = TextComponent(
       text: 'KUNDE',
       position: Vector2(
-        size.x - 125,
-        size.y * 0.72 - 115,
+        worldWidth - 170,
+        groundY - 120,
       ),
       textRenderer: TextPaint(
         style: const TextStyle(
@@ -111,8 +132,8 @@ class OffroadDeliveryGame extends FlameGame {
 
     vanBody = RectangleComponent(
       position: Vector2(
-        145,
-        size.y * 0.72 - 65,
+        185,
+        groundY - 65,
       ),
       size: Vector2(
         125,
@@ -144,48 +165,34 @@ class OffroadDeliveryGame extends FlameGame {
 
     cargo = RectangleComponent(
       position: Vector2(
-        92,
-        size.y * 0.72 - 20,
+        115,
+        groundY - 22,
       ),
       size: Vector2(
-        24,
-        20,
+        26,
+        22,
       ),
       paint: Paint()
         ..color = const Color(0xFFD69A4A),
     );
 
-    missionText = TextComponent(
-      text: 'Auftrag: Paket beim Depot abholen',
-      position: Vector2(
-        size.x / 2,
-        25,
-      ),
-      anchor: Anchor.topCenter,
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    await gameWorld.addAll([
+      ground,
+      depot,
+      depotLabel,
+      customer,
+      customerLabel,
+      cargo,
+      vanBody,
+      rearWheel,
+      frontWheel,
+    ]);
+
+    camera.follow(
+      vanBody,
+      horizontalOnly: true,
+      snap: true,
     );
-
-    add(ground);
-
-    add(depot);
-    add(customer);
-
-    add(depotLabel);
-    add(customerLabel);
-
-    add(cargo);
-
-    add(vanBody);
-    add(rearWheel);
-    add(frontWheel);
-
-    add(missionText);
   }
 
   void setThrottle(double value) {
@@ -224,15 +231,16 @@ class OffroadDeliveryGame extends FlameGame {
       );
     }
 
-    _keepVehicleOnScreen();
+    _keepVehicleInsideWorld();
     _checkMission();
   }
 
   void _checkMission() {
-    if (!_cargoLoaded && vanBody.position.x <= 125) {
+    if (!_cargoLoaded && vanBody.position.x <= 160) {
       _cargoLoaded = true;
 
-      missionText.text = 'Lieferung geladen – bringe sie zum Kunden!';
+      missionNotifier.value =
+          'Lieferung geladen – bringe sie zum Kunden!';
     }
 
     if (_cargoLoaded &&
@@ -241,7 +249,8 @@ class OffroadDeliveryGame extends FlameGame {
       _missionCompleted = true;
       _throttle = 0;
 
-      missionText.text = 'LIEFERUNG ERFOLGREICH! +100 €';
+      missionNotifier.value =
+          'LIEFERUNG ERFOLGREICH! +100 €';
     }
   }
 
@@ -261,17 +270,17 @@ class OffroadDeliveryGame extends FlameGame {
     }
   }
 
-  void _keepVehicleOnScreen() {
-    final double minimumX = 20;
-    final double maximumX = size.x - vanBody.size.x - 20;
+  void _keepVehicleInsideWorld() {
+    const double minimumX = 20;
+
+    final double maximumX =
+        worldWidth - vanBody.size.x - 20;
 
     if (vanBody.position.x < minimumX) {
       final double correction =
           minimumX - vanBody.position.x;
 
-      vanBody.position.x += correction;
-      rearWheel.position.x += correction;
-      frontWheel.position.x += correction;
+      _moveVehicle(correction);
 
       _speed = 0;
     }
@@ -280,11 +289,21 @@ class OffroadDeliveryGame extends FlameGame {
       final double correction =
           maximumX - vanBody.position.x;
 
-      vanBody.position.x += correction;
-      rearWheel.position.x += correction;
-      frontWheel.position.x += correction;
+      _moveVehicle(correction);
 
       _speed = 0;
     }
+  }
+
+  void _moveVehicle(double movement) {
+    vanBody.position.x += movement;
+    rearWheel.position.x += movement;
+    frontWheel.position.x += movement;
+  }
+
+  @override
+  void onRemove() {
+    missionNotifier.dispose();
+    super.onRemove();
   }
 }

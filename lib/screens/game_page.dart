@@ -43,6 +43,7 @@ class _GamePageState extends State<GamePage> {
             ),
           ),
 
+          // Zurück-Button
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -60,6 +61,50 @@ class _GamePageState extends State<GamePage> {
             ),
           ),
 
+          // Festes Missions-HUD
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  top: 12,
+                  left: 90,
+                  right: 90,
+                ),
+                child: ValueListenableBuilder<String>(
+                  valueListenable: _game.missionNotifier,
+                  builder: (context, missionText, _) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(
+                          alpha: 0.65,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white24,
+                        ),
+                      ),
+                      child: Text(
+                        missionText,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+
+          // Bremse / Rückwärts
           Positioned(
             left: 30,
             bottom: 25,
@@ -71,6 +116,7 @@ class _GamePageState extends State<GamePage> {
             ),
           ),
 
+          // Gas
           Positioned(
             right: 30,
             bottom: 25,

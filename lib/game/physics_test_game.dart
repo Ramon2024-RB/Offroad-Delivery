@@ -7,6 +7,7 @@ import 'components/physics_wheel.dart';
 
 class PhysicsTestGame extends Forge2DGame {
   PhysicsTestGame({
+    this.onCargoPickedUp,
     this.onDeliveryCompleted,
   }) : super(
           gravity: Vector2(
@@ -19,6 +20,8 @@ class PhysicsTestGame extends Forge2DGame {
             height: 400,
           ),
         );
+
+  final VoidCallback? onCargoPickedUp;
 
   final void Function(
     int moneyReward,
@@ -42,6 +45,18 @@ class PhysicsTestGame extends Forge2DGame {
 
   static const double _motorSpeed = 18;
   static const double _motorTorque = 45;
+
+  // Geschwindigkeit, unterhalb der wir die
+  // Fahrtrichtung wechseln dürfen.
+  static const double _directionChangeSpeed = 0.75;
+
+  // Stärke der Bremse beim Drücken der
+  // entgegengesetzten Fahrtrichtung.
+  static const double _brakeStrength = 8.0;
+
+  // Leichte Motorbremse, wenn kein Pedal
+  // gedrückt wird.
+  static const double _coastBrakeStrength = 1.2;
 
   static const double _rearWheelX = -1.45;
   static const double _frontWheelX = 1.45;
@@ -145,9 +160,131 @@ class PhysicsTestGame extends Forge2DGame {
       vehicleY + 0.5,
     );
 
+    _updateDrivePhysics(dt);
+
     _checkPickup(vehicleX);
 
     _checkDelivery(vehicleX);
+  }
+
+  void _updateDrivePhysics(double dt) {
+    final double horizontalSpeed =
+        vehicle.body.linearVelocity.x;
+
+    // ------------------------------------------
+    // KEIN PEDAL:
+    // leichte Motorbremse
+    // ------------------------------------------
+
+    if (_throttle == 0) {
+      rearWheelJoint.motorSpeed = 0;
+
+      _applyHorizontalBrake(
+        _coastBrakeStrength,
+        dt,
+      );
+
+      return;
+    }
+
+    // ------------------------------------------
+    // GAS / VORWÄRTS
+    // ------------------------------------------
+
+    if (_throttle > 0) {
+      // Wir rollen noch deutlich rückwärts:
+      // erst abbremsen.
+      if (horizontalSpeed <
+          -_directionChangeSpeed) {
+        rearWheelJoint.motorSpeed = 0;
+
+        _applyHorizontalBrake(
+          _brakeStrength,
+          dt,
+        );
+
+        return;
+      }
+
+      // Fast Stillstand oder bereits vorwärts:
+      // normal Gas geben.
+      rearWheelJoint.motorSpeed =
+          _motorSpeed;
+
+      return;
+    }
+
+    // ------------------------------------------
+    // RÜCKWÄRTS / BREMSE
+    // ------------------------------------------
+
+    if (_throttle < 0) {
+      // Wir fahren noch deutlich vorwärts:
+      // zuerst kräftig abbremsen.
+      if (horizontalSpeed >
+          _directionChangeSpeed) {
+        rearWheelJoint.motorSpeed = 0;
+
+        _applyHorizontalBrake(
+          _brakeStrength,
+          dt,
+        );
+
+        return;
+      }
+
+      // Fast Stillstand oder bereits rückwärts:
+      // Rückwärtsgang.
+      rearWheelJoint.motorSpeed =
+          -_motorSpeed;
+    }
+  }
+
+  void _applyHorizontalBrake(
+    double strength,
+    double dt,
+  ) {
+    final Vector2 velocity =
+        vehicle.body.linearVelocity;
+
+    final double horizontalSpeed =
+        velocity.x;
+
+    if (horizontalSpeed.abs() < 0.05) {
+      vehicle.body.linearVelocity = Vector2(
+        0,
+        velocity.y,
+      );
+
+      return;
+    }
+
+    final double brakingAmount =
+        strength * dt;
+
+    double newHorizontalSpeed =
+        horizontalSpeed;
+
+    if (horizontalSpeed > 0) {
+      newHorizontalSpeed =
+          (horizontalSpeed - brakingAmount)
+              .clamp(
+                0.0,
+                double.infinity,
+              );
+    } else {
+      newHorizontalSpeed =
+          (horizontalSpeed + brakingAmount)
+              .clamp(
+                double.negativeInfinity,
+                0.0,
+              );
+    }
+
+    vehicle.body.linearVelocity = Vector2(
+      newHorizontalSpeed,
+      velocity.y,
+    );
   }
 
   void _checkPickup(double vehicleX) {
@@ -160,6 +297,8 @@ class PhysicsTestGame extends Forge2DGame {
       _cargoPickedUp = true;
 
       vehicle.showCargo();
+
+      onCargoPickedUp?.call();
     }
   }
 
@@ -184,8 +323,12 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
+    // Für die Lieferung interessiert uns vor allem,
+    // ob der Pickup horizontal fast steht.
+    // Federbewegungen nach oben/unten sollen die
+    // Ablieferung nicht verhindern.
     final double speed =
-        vehicle.body.linearVelocity.length;
+        vehicle.body.linearVelocity.x.abs();
 
     if (speed > _deliveryMaxSpeed) {
       return;
@@ -274,14 +417,6 @@ class PhysicsTestGame extends Forge2DGame {
       -1.0,
       1.0,
     );
-
-    if (_throttle == 0) {
-      rearWheelJoint.motorSpeed = 0;
-      return;
-    }
-
-    rearWheelJoint.motorSpeed =
-        _motorSpeed * _throttle;
   }
 }
 

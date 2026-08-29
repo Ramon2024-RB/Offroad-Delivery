@@ -2,8 +2,39 @@ import 'package:flutter/material.dart';
 
 import 'game_page.dart';
 
-class MainMenuPage extends StatelessWidget {
+class MainMenuPage extends StatefulWidget {
   const MainMenuPage({super.key});
+
+  @override
+  State<MainMenuPage> createState() => _MainMenuPageState();
+}
+
+class _MainMenuPageState extends State<MainMenuPage> {
+  bool _isStartingGame = false;
+
+  Future<void> _startGame() async {
+    if (_isStartingGame) {
+      return;
+    }
+
+    setState(() {
+      _isStartingGame = true;
+    });
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const GamePage(),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isStartingGame = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,10 +59,10 @@ class MainMenuPage extends StatelessWidget {
                   constraints.maxWidth > constraints.maxHeight;
 
               if (isLandscape) {
-                return _buildLandscapeMenu(context);
+                return _buildLandscapeMenu();
               }
 
-              return _buildPortraitMenu(context);
+              return _buildPortraitMenu();
             },
           ),
         ),
@@ -39,7 +70,7 @@ class MainMenuPage extends StatelessWidget {
     );
   }
 
-  Widget _buildLandscapeMenu(BuildContext context) {
+  Widget _buildLandscapeMenu() {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: 48,
@@ -56,14 +87,14 @@ class MainMenuPage extends StatelessWidget {
           ),
           const SizedBox(width: 50),
           Expanded(
-            child: _buildButtons(context),
+            child: _buildButtons(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPortraitMenu(BuildContext context) {
+  Widget _buildPortraitMenu() {
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -78,7 +109,7 @@ class MainMenuPage extends StatelessWidget {
               subtitleSize: 22,
             ),
             const SizedBox(height: 35),
-            _buildButtons(context),
+            _buildButtons(),
           ],
         ),
       ),
@@ -131,7 +162,7 @@ class MainMenuPage extends StatelessWidget {
     );
   }
 
-  Widget _buildButtons(BuildContext context) {
+  Widget _buildButtons() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -139,19 +170,25 @@ class MainMenuPage extends StatelessWidget {
           width: double.infinity,
           height: 52,
           child: FilledButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const GamePage(),
-                ),
-              );
-            },
-            icon: const Icon(
-              Icons.play_arrow_rounded,
-            ),
-            label: const Text(
-              'SPIELEN',
-              style: TextStyle(
+            onPressed: _isStartingGame
+                ? null
+                : _startGame,
+            icon: _isStartingGame
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : const Icon(
+                    Icons.play_arrow_rounded,
+                  ),
+            label: Text(
+              _isStartingGame
+                  ? 'LÄDT...'
+                  : 'SPIELEN',
+              style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 2,
@@ -180,12 +217,14 @@ class MainMenuPage extends StatelessWidget {
             icon: const Icon(
               Icons.settings_rounded,
             ),
-            label: const Text('EINSTELLUNGEN'),
+            label: const Text(
+              'EINSTELLUNGEN',
+            ),
           ),
         ),
         const SizedBox(height: 16),
         const Text(
-          'Development Build • v0.2.1',
+          'Development Build • v0.2.3',
           style: TextStyle(
             fontSize: 11,
             color: Colors.white38,

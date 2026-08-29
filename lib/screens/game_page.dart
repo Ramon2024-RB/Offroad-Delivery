@@ -14,7 +14,16 @@ class GamePage extends StatefulWidget {
 class _GamePageState extends State<GamePage> {
   late final PhysicsTestGame _game;
 
+  String _missionText =
+      'Fahre zur Abholstation';
+
+  IconData _missionIcon =
+      Icons.inventory_2_rounded;
+
   bool _showDeliveryCompleted = false;
+
+  int _money = 0;
+  int _xp = 0;
 
   int _moneyReward = 0;
   int _xpReward = 0;
@@ -24,6 +33,19 @@ class _GamePageState extends State<GamePage> {
     super.initState();
 
     _game = PhysicsTestGame(
+      onCargoPickedUp: () {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _missionText =
+              'Paket geladen – fahre zum Kunden';
+
+          _missionIcon =
+              Icons.local_shipping_rounded;
+        });
+      },
       onDeliveryCompleted: (
         int moneyReward,
         int xpReward,
@@ -35,6 +57,16 @@ class _GamePageState extends State<GamePage> {
         setState(() {
           _moneyReward = moneyReward;
           _xpReward = xpReward;
+
+          _money += moneyReward;
+          _xp += xpReward;
+
+          _missionText =
+              'Lieferung abgeschlossen';
+
+          _missionIcon =
+              Icons.check_circle_rounded;
+
           _showDeliveryCompleted = true;
         });
       },
@@ -86,7 +118,37 @@ class _GamePageState extends State<GamePage> {
           ),
 
           // ------------------------------------------
-          // TEST-VERSION
+          // GELD UND XP
+          // ------------------------------------------
+
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _HudValue(
+                      icon:
+                          Icons.monetization_on_rounded,
+                      value: '$_money',
+                    ),
+                    const SizedBox(
+                      width: 8,
+                    ),
+                    _HudValue(
+                      icon: Icons.star_rounded,
+                      value: '$_xp XP',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ------------------------------------------
+          // MISSIONSZIEL
           // ------------------------------------------
 
           SafeArea(
@@ -95,34 +157,70 @@ class _GamePageState extends State<GamePage> {
               child: Padding(
                 padding: const EdgeInsets.only(
                   top: 12,
-                  left: 90,
-                  right: 90,
+                  left: 190,
+                  right: 190,
                 ),
                 child: Container(
+                  constraints:
+                      const BoxConstraints(
+                    maxWidth: 460,
+                  ),
                   padding:
                       const EdgeInsets.symmetric(
                     horizontal: 20,
-                    vertical: 10,
+                    vertical: 11,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(
-                      alpha: 0.65,
+                      alpha: 0.68,
                     ),
                     borderRadius:
                         BorderRadius.circular(16),
                     border: Border.all(
                       color: Colors.white24,
                     ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8,
+                        offset: Offset(
+                          0,
+                          3,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'PHYSIK-TEST • v0.2.2',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
-                    ),
+                  child: Row(
+                    mainAxisSize:
+                        MainAxisSize.min,
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _missionIcon,
+                        color: const Color(
+                          0xFFFFD866,
+                        ),
+                        size: 22,
+                      ),
+                      const SizedBox(
+                        width: 9,
+                      ),
+                      Flexible(
+                        child: Text(
+                          _missionText,
+                          textAlign:
+                              TextAlign.center,
+                          style:
+                              const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -130,16 +228,18 @@ class _GamePageState extends State<GamePage> {
           ),
 
           // ------------------------------------------
-          // LIEFERUNG ABGESCHLOSSEN HUD
+          // LIEFERUNG ABGESCHLOSSEN
           // ------------------------------------------
 
           if (_showDeliveryCompleted)
             SafeArea(
               child: Align(
-                alignment: Alignment.topCenter,
+                alignment:
+                    Alignment.topCenter,
                 child: Padding(
-                  padding: const EdgeInsets.only(
-                    top: 72,
+                  padding:
+                      const EdgeInsets.only(
+                    top: 78,
                     left: 20,
                     right: 20,
                   ),
@@ -158,7 +258,9 @@ class _GamePageState extends State<GamePage> {
                         0xEE1D2A20,
                       ),
                       borderRadius:
-                          BorderRadius.circular(18),
+                          BorderRadius.circular(
+                        18,
+                      ),
                       border: Border.all(
                         color: const Color(
                           0xFFF2C94C,
@@ -180,17 +282,38 @@ class _GamePageState extends State<GamePage> {
                       mainAxisSize:
                           MainAxisSize.min,
                       children: [
-                        const Text(
-                          'LIEFERUNG ABGESCHLOSSEN!',
-                          textAlign:
-                              TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight:
-                                FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
+                        const Row(
+                          mainAxisSize:
+                              MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons
+                                  .check_circle_rounded,
+                              color: Color(
+                                0xFF7DDB83,
+                              ),
+                              size: 25,
+                            ),
+                            SizedBox(
+                              width: 9,
+                            ),
+                            Flexible(
+                              child: Text(
+                                'LIEFERUNG ABGESCHLOSSEN!',
+                                textAlign:
+                                    TextAlign.center,
+                                style: TextStyle(
+                                  color:
+                                      Colors.white,
+                                  fontSize: 20,
+                                  fontWeight:
+                                      FontWeight.bold,
+                                  letterSpacing:
+                                      0.5,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(
                           height: 7,
@@ -199,7 +322,8 @@ class _GamePageState extends State<GamePage> {
                           '+$_moneyReward Geld   •   +$_xpReward XP',
                           textAlign:
                               TextAlign.center,
-                          style: const TextStyle(
+                          style:
+                              const TextStyle(
                             color: Color(
                               0xFFFFD866,
                             ),
@@ -244,6 +368,59 @@ class _GamePageState extends State<GamePage> {
               label: 'GAS',
               onPressed: _startGas,
               onReleased: _releasePedal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HudValue extends StatelessWidget {
+  const _HudValue({
+    required this.icon,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 13,
+        vertical: 9,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(
+          alpha: 0.68,
+        ),
+        borderRadius:
+            BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white24,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 19,
+            color: const Color(
+              0xFFFFD866,
+            ),
+          ),
+          const SizedBox(
+            width: 6,
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],

@@ -3,6 +3,8 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import 'components/delivery_vehicle.dart';
+import 'components/parallax_background_component.dart';
+import 'components/roadside_scenery_component.dart';
 import 'components/terrain_component.dart';
 
 enum DeliveryRoute {
@@ -16,7 +18,9 @@ class OffroadDeliveryGame extends FlameGame {
 
   late final World gameWorld;
 
+  late final ParallaxBackgroundComponent parallaxBackground;
   late final TerrainComponent terrain;
+  late final RoadsideSceneryComponent roadsideScenery;
   late final DeliveryVehicle vehicle;
 
   late final RectangleComponent depot;
@@ -84,7 +88,18 @@ class OffroadDeliveryGame extends FlameGame {
 
     add(camera);
 
+    parallaxBackground =
+        ParallaxBackgroundComponent(
+      worldWidth: worldWidth,
+    );
+
     terrain = TerrainComponent(
+      worldWidth: worldWidth,
+    );
+
+    roadsideScenery =
+        RoadsideSceneryComponent(
+      terrain: terrain,
       worldWidth: worldWidth,
     );
 
@@ -220,7 +235,9 @@ class OffroadDeliveryGame extends FlameGame {
     );
 
     await gameWorld.addAll([
+      parallaxBackground,
       terrain,
+      roadsideScenery,
       depot,
       depotLabel,
       depotCargo,
@@ -232,6 +249,7 @@ class OffroadDeliveryGame extends FlameGame {
     ]);
 
     _updateVehicleTerrainPosition();
+    _updateParallaxBackground();
 
     camera.follow(
       vehicle,
@@ -332,10 +350,22 @@ class OffroadDeliveryGame extends FlameGame {
 
     _keepVehicleInsideWorld();
     _updateVehicleTerrainPosition();
+    _updateParallaxBackground();
 
     _checkCargoPickup();
     _checkRouteChoice();
     _checkMissionCompletion();
+  }
+
+  void _updateParallaxBackground() {
+    final double vehicleCenterX =
+        vehicle.position.x +
+            (vehicle.size.x / 2);
+
+    parallaxBackground
+        .updateCameraPosition(
+      vehicleCenterX,
+    );
   }
 
   void _applySlopeEffect(double dt) {

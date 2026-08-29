@@ -185,7 +185,7 @@ class MainMenuPage extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         const Text(
-          'Development Build • v0.2.0',
+          'Development Build • v0.2.1',
           style: TextStyle(
             fontSize: 11,
             color: Colors.white38,

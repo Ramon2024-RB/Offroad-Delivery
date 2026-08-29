@@ -3,33 +3,26 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 
 class BackgroundComponent extends PositionComponent {
-  BackgroundComponent({
-    required this.worldWidth,
-  }) : super(
-          position: Vector2.zero(),
-          size: Vector2(worldWidth, 400),
-          priority: -100,
-        );
+  BackgroundComponent({required this.worldWidth})
+    : super(
+        position: Vector2.zero(),
+        size: Vector2(worldWidth, 400),
+        priority: -100,
+      );
 
   final double worldWidth;
 
-  final Paint _skyPaint = Paint()
-    ..color = const Color(0xFF87B7D9);
+  final Paint _skyPaint = Paint()..color = const Color(0xFF87B7D9);
 
-  final Paint _farMountainPaint = Paint()
-    ..color = const Color(0xFF78919A);
+  final Paint _farMountainPaint = Paint()..color = const Color(0xFF78919A);
 
-  final Paint _farHillPaint = Paint()
-    ..color = const Color(0xFF58786B);
+  final Paint _farHillPaint = Paint()..color = const Color(0xFF58786B);
 
-  final Paint _farTreePaint = Paint()
-    ..color = const Color(0xFF355A43);
+  final Paint _farTreePaint = Paint()..color = const Color(0xFF355A43);
 
-  final Paint _farTreeDarkPaint = Paint()
-    ..color = const Color(0xFF2C4F39);
+  final Paint _farTreeDarkPaint = Paint()..color = const Color(0xFF2C4F39);
 
-  final Paint _trunkPaint = Paint()
-    ..color = const Color(0xFF4D493A);
+  final Paint _trunkPaint = Paint()..color = const Color(0xFF4D493A);
 
   final List<Vector2> _backgroundGroundPoints = [
     Vector2(0, 275),
@@ -66,15 +59,7 @@ class BackgroundComponent extends PositionComponent {
   }
 
   void _drawSky(Canvas canvas) {
-    canvas.drawRect(
-      Rect.fromLTWH(
-        0,
-        0,
-        worldWidth,
-        size.y,
-      ),
-      _skyPaint,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, 0, worldWidth, size.y), _skyPaint);
   }
 
   void _drawFarMountains(Canvas canvas) {
@@ -111,22 +96,13 @@ class BackgroundComponent extends PositionComponent {
 
     mountains.lineTo(worldWidth, 180);
 
-    mountains.lineTo(
-      worldWidth,
-      size.y,
-    );
+    mountains.lineTo(worldWidth, size.y);
 
-    mountains.lineTo(
-      0,
-      size.y,
-    );
+    mountains.lineTo(0, size.y);
 
     mountains.close();
 
-    canvas.drawPath(
-      mountains,
-      _farMountainPaint,
-    );
+    canvas.drawPath(mountains, _farMountainPaint);
   }
 
   void _drawBackgroundHills(Canvas canvas) {
@@ -137,104 +113,39 @@ class BackgroundComponent extends PositionComponent {
       _backgroundGroundPoints.first.y,
     );
 
-    for (
-      final Vector2 point
-      in _backgroundGroundPoints.skip(1)
-    ) {
-      hills.lineTo(
-        point.x,
-        point.y,
-      );
+    for (final Vector2 point in _backgroundGroundPoints.skip(1)) {
+      hills.lineTo(point.x, point.y);
     }
 
-    hills.lineTo(
-      worldWidth,
-      size.y,
-    );
+    hills.lineTo(worldWidth, size.y);
 
-    hills.lineTo(
-      0,
-      size.y,
-    );
+    hills.lineTo(0, size.y);
 
     hills.close();
 
-    canvas.drawPath(
-      hills,
-      _farHillPaint,
-    );
+    canvas.drawPath(hills, _farHillPaint);
   }
 
   void _drawBackgroundForest(Canvas canvas) {
-    _drawTreeGroup(
-      canvas,
-      startX: 80,
-      treeCount: 5,
-      spacing: 46,
-    );
+    _drawTreeGroup(canvas, startX: 80, treeCount: 5, spacing: 46);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 390,
-      treeCount: 3,
-      spacing: 55,
-    );
+    _drawTreeGroup(canvas, startX: 390, treeCount: 3, spacing: 55);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 650,
-      treeCount: 6,
-      spacing: 43,
-    );
+    _drawTreeGroup(canvas, startX: 650, treeCount: 6, spacing: 43);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 1030,
-      treeCount: 4,
-      spacing: 52,
-    );
+    _drawTreeGroup(canvas, startX: 1030, treeCount: 4, spacing: 52);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 1340,
-      treeCount: 7,
-      spacing: 42,
-    );
+    _drawTreeGroup(canvas, startX: 1340, treeCount: 7, spacing: 42);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 1770,
-      treeCount: 3,
-      spacing: 58,
-    );
+    _drawTreeGroup(canvas, startX: 1770, treeCount: 3, spacing: 58);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 2050,
-      treeCount: 6,
-      spacing: 45,
-    );
+    _drawTreeGroup(canvas, startX: 2050, treeCount: 6, spacing: 45);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 2440,
-      treeCount: 4,
-      spacing: 54,
-    );
+    _drawTreeGroup(canvas, startX: 2440, treeCount: 4, spacing: 54);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 2760,
-      treeCount: 7,
-      spacing: 41,
-    );
+    _drawTreeGroup(canvas, startX: 2760, treeCount: 7, spacing: 41);
 
-    _drawTreeGroup(
-      canvas,
-      startX: 3200,
-      treeCount: 5,
-      spacing: 48,
-    );
+    _drawTreeGroup(canvas, startX: 3200, treeCount: 5, spacing: 48);
   }
 
   void _drawTreeGroup(
@@ -244,26 +155,20 @@ class BackgroundComponent extends PositionComponent {
     required double spacing,
   }) {
     for (int i = 0; i < treeCount; i++) {
-      final double x =
-          startX + (i * spacing);
+      final double x = startX + (i * spacing);
 
-      final double heightVariation =
-          (i % 3) * 8;
+      final double heightVariation = (i % 3) * 8;
 
-      final double widthVariation =
-          (i % 2) * 5;
+      final double widthVariation = (i % 2) * 5;
 
-      final bool darker =
-          i.isEven;
+      final bool darker = i.isEven;
 
       _drawBackgroundTree(
         canvas,
         x: x,
         height: 52 + heightVariation,
         width: 28 + widthVariation,
-        paint: darker
-            ? _farTreeDarkPaint
-            : _farTreePaint,
+        paint: darker ? _farTreeDarkPaint : _farTreePaint,
       );
     }
   }
@@ -275,14 +180,11 @@ class BackgroundComponent extends PositionComponent {
     required double width,
     required Paint paint,
   }) {
-    final double groundY =
-        _getBackgroundGroundY(x);
+    final double groundY = _getBackgroundGroundY(x);
 
-    final double trunkHeight =
-        height * 0.25;
+    final double trunkHeight = height * 0.25;
 
-    final double trunkWidth =
-        width * 0.12;
+    final double trunkWidth = width * 0.12;
 
     canvas.drawRect(
       Rect.fromLTWH(
@@ -296,114 +198,59 @@ class BackgroundComponent extends PositionComponent {
 
     final Path lowerCrown = Path();
 
-    lowerCrown.moveTo(
-      x,
-      groundY - height,
-    );
+    lowerCrown.moveTo(x, groundY - height);
 
-    lowerCrown.lineTo(
-      x - (width / 2),
-      groundY - (height * 0.12),
-    );
+    lowerCrown.lineTo(x - (width / 2), groundY - (height * 0.12));
 
-    lowerCrown.lineTo(
-      x + (width / 2),
-      groundY - (height * 0.12),
-    );
+    lowerCrown.lineTo(x + (width / 2), groundY - (height * 0.12));
 
     lowerCrown.close();
 
-    canvas.drawPath(
-      lowerCrown,
-      paint,
-    );
+    canvas.drawPath(lowerCrown, paint);
 
     final Path middleCrown = Path();
 
-    middleCrown.moveTo(
-      x,
-      groundY - (height * 1.12),
-    );
+    middleCrown.moveTo(x, groundY - (height * 1.12));
 
-    middleCrown.lineTo(
-      x - (width * 0.40),
-      groundY - (height * 0.40),
-    );
+    middleCrown.lineTo(x - (width * 0.40), groundY - (height * 0.40));
 
-    middleCrown.lineTo(
-      x + (width * 0.40),
-      groundY - (height * 0.40),
-    );
+    middleCrown.lineTo(x + (width * 0.40), groundY - (height * 0.40));
 
     middleCrown.close();
 
-    canvas.drawPath(
-      middleCrown,
-      paint,
-    );
+    canvas.drawPath(middleCrown, paint);
 
     final Path upperCrown = Path();
 
-    upperCrown.moveTo(
-      x,
-      groundY - (height * 1.22),
-    );
+    upperCrown.moveTo(x, groundY - (height * 1.22));
 
-    upperCrown.lineTo(
-      x - (width * 0.28),
-      groundY - (height * 0.68),
-    );
+    upperCrown.lineTo(x - (width * 0.28), groundY - (height * 0.68));
 
-    upperCrown.lineTo(
-      x + (width * 0.28),
-      groundY - (height * 0.68),
-    );
+    upperCrown.lineTo(x + (width * 0.28), groundY - (height * 0.68));
 
     upperCrown.close();
 
-    canvas.drawPath(
-      upperCrown,
-      paint,
-    );
+    canvas.drawPath(upperCrown, paint);
   }
 
-  double _getBackgroundGroundY(
-    double x,
-  ) {
-    if (x <=
-        _backgroundGroundPoints.first.x) {
-      return _backgroundGroundPoints
-          .first.y;
+  double _getBackgroundGroundY(double x) {
+    if (x <= _backgroundGroundPoints.first.x) {
+      return _backgroundGroundPoints.first.y;
     }
 
-    if (x >=
-        _backgroundGroundPoints.last.x) {
-      return _backgroundGroundPoints
-          .last.y;
+    if (x >= _backgroundGroundPoints.last.x) {
+      return _backgroundGroundPoints.last.y;
     }
 
-    for (
-      int i = 0;
-      i <
-          _backgroundGroundPoints.length -
-              1;
-      i++
-    ) {
-      final Vector2 start =
-          _backgroundGroundPoints[i];
+    for (int i = 0; i < _backgroundGroundPoints.length - 1; i++) {
+      final Vector2 start = _backgroundGroundPoints[i];
 
-      final Vector2 end =
-          _backgroundGroundPoints[i + 1];
+      final Vector2 end = _backgroundGroundPoints[i + 1];
 
-      if (x >= start.x &&
-          x <= end.x) {
-        final double progress =
-            (x - start.x) /
-                (end.x - start.x);
+      if (x >= start.x && x <= end.x) {
+        final double progress = (x - start.x) / (end.x - start.x);
 
-        return start.y +
-            ((end.y - start.y) *
-                progress);
+        return start.y + ((end.y - start.y) * progress);
       }
     }
 

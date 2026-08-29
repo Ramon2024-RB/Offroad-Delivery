@@ -3,13 +3,12 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 
 class ParallaxBackgroundComponent extends PositionComponent {
-  ParallaxBackgroundComponent({
-    required this.worldWidth,
-  }) : super(
-          position: Vector2.zero(),
-          size: Vector2(worldWidth, 400),
-          priority: -200,
-        );
+  ParallaxBackgroundComponent({required this.worldWidth})
+    : super(
+        position: Vector2.zero(),
+        size: Vector2(worldWidth, 400),
+        priority: -200,
+      );
 
   final double worldWidth;
 
@@ -18,26 +17,19 @@ class ParallaxBackgroundComponent extends PositionComponent {
   static const double _drawingStartX = -1800;
   static const double _drawingEndX = 6200;
 
-  final Paint _skyPaint = Paint()
-    ..color = const Color(0xFF87B7D9);
+  final Paint _skyPaint = Paint()..color = const Color(0xFF87B7D9);
 
-  final Paint _farMountainPaint = Paint()
-    ..color = const Color(0xFF8198A0);
+  final Paint _farMountainPaint = Paint()..color = const Color(0xFF8198A0);
 
-  final Paint _middleMountainPaint = Paint()
-    ..color = const Color(0xFF687F78);
+  final Paint _middleMountainPaint = Paint()..color = const Color(0xFF687F78);
 
-  final Paint _farHillPaint = Paint()
-    ..color = const Color(0xFF4E6F5A);
+  final Paint _farHillPaint = Paint()..color = const Color(0xFF4E6F5A);
 
-  final Paint _farTreePaint = Paint()
-    ..color = const Color(0xFF355A43);
+  final Paint _farTreePaint = Paint()..color = const Color(0xFF355A43);
 
-  final Paint _farTreeDarkPaint = Paint()
-    ..color = const Color(0xFF294B36);
+  final Paint _farTreeDarkPaint = Paint()..color = const Color(0xFF294B36);
 
-  final Paint _trunkPaint = Paint()
-    ..color = const Color(0xFF4B493B);
+  final Paint _trunkPaint = Paint()..color = const Color(0xFF4B493B);
 
   void updateCameraPosition(double x) {
     cameraX = x;
@@ -50,26 +42,17 @@ class ParallaxBackgroundComponent extends PositionComponent {
     _drawSky(canvas);
 
     canvas.save();
-    canvas.translate(
-      cameraX * 0.78,
-      0,
-    );
+    canvas.translate(cameraX * 0.78, 0);
     _drawFarMountains(canvas);
     canvas.restore();
 
     canvas.save();
-    canvas.translate(
-      cameraX * 0.60,
-      0,
-    );
+    canvas.translate(cameraX * 0.60, 0);
     _drawMiddleMountains(canvas);
     canvas.restore();
 
     canvas.save();
-    canvas.translate(
-      cameraX * 0.38,
-      0,
-    );
+    canvas.translate(cameraX * 0.38, 0);
     _drawFarHills(canvas);
     _drawFarForest(canvas);
     canvas.restore();
@@ -77,12 +60,7 @@ class ParallaxBackgroundComponent extends PositionComponent {
 
   void _drawSky(Canvas canvas) {
     canvas.drawRect(
-      Rect.fromLTWH(
-        _drawingStartX,
-        0,
-        _drawingEndX - _drawingStartX,
-        size.y,
-      ),
+      Rect.fromLTWH(_drawingStartX, 0, _drawingEndX - _drawingStartX, size.y),
       _skyPaint,
     );
   }
@@ -190,17 +168,8 @@ class ParallaxBackgroundComponent extends PositionComponent {
 
     const double sectionWidth = 240;
 
-    for (
-      double x = _drawingStartX;
-      x <= _drawingEndX;
-      x += sectionWidth
-    ) {
-      points.add(
-        Offset(
-          x,
-          _farHillGroundY(x),
-        ),
-      );
+    for (double x = _drawingStartX; x <= _drawingEndX; x += sectionWidth) {
+      points.add(Offset(x, _farHillGroundY(x)));
     }
 
     _drawSmoothLandscape(
@@ -223,50 +192,28 @@ class ParallaxBackgroundComponent extends PositionComponent {
 
     final Path path = Path();
 
-    path.moveTo(
-      points.first.dx,
-      points.first.dy,
-    );
+    path.moveTo(points.first.dx, points.first.dy);
 
     for (int i = 0; i < points.length - 1; i++) {
       final Offset current = points[i];
       final Offset next = points[i + 1];
 
-      final double middleX =
-          (current.dx + next.dx) / 2;
+      final double middleX = (current.dx + next.dx) / 2;
 
-      final double middleY =
-          (current.dy + next.dy) / 2;
+      final double middleY = (current.dy + next.dy) / 2;
 
-      path.quadraticBezierTo(
-        current.dx,
-        current.dy,
-        middleX,
-        middleY,
-      );
+      path.quadraticBezierTo(current.dx, current.dy, middleX, middleY);
     }
 
-    path.lineTo(
-      points.last.dx,
-      points.last.dy,
-    );
+    path.lineTo(points.last.dx, points.last.dy);
 
-    path.lineTo(
-      points.last.dx,
-      bottomY,
-    );
+    path.lineTo(points.last.dx, bottomY);
 
-    path.lineTo(
-      points.first.dx,
-      bottomY,
-    );
+    path.lineTo(points.first.dx, bottomY);
 
     path.close();
 
-    canvas.drawPath(
-      path,
-      paint,
-    );
+    canvas.drawPath(path, paint);
   }
 
   void _drawFarForest(Canvas canvas) {
@@ -294,47 +241,24 @@ class ParallaxBackgroundComponent extends PositionComponent {
       const _TreeGroup(5870, 6, 42),
     ];
 
-    for (
-      int groupIndex = 0;
-      groupIndex < groups.length;
-      groupIndex++
-    ) {
-      final _TreeGroup group =
-          groups[groupIndex];
+    for (int groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      final _TreeGroup group = groups[groupIndex];
 
-      for (
-        int treeIndex = 0;
-        treeIndex < group.count;
-        treeIndex++
-      ) {
-        final double spacingVariation =
-            (treeIndex % 3) * 5;
+      for (int treeIndex = 0; treeIndex < group.count; treeIndex++) {
+        final double spacingVariation = (treeIndex % 3) * 5;
 
         final double x =
-            group.startX +
-            (treeIndex *
-                (group.spacing +
-                    spacingVariation));
+            group.startX + (treeIndex * (group.spacing + spacingVariation));
 
-        final double groundY =
-            _farHillGroundY(x);
+        final double groundY = _farHillGroundY(x);
 
-        final double height =
-            38 +
-            (((treeIndex * 7) +
-                        (groupIndex * 3)) %
-                    24);
+        final double height = 38 + (((treeIndex * 7) + (groupIndex * 3)) % 24);
 
-        final double width =
-            22 +
-            (((treeIndex * 5) +
-                        groupIndex) %
-                    11);
+        final double width = 22 + (((treeIndex * 5) + groupIndex) % 11);
 
-        final Paint treePaint =
-            (treeIndex + groupIndex).isEven
-                ? _farTreeDarkPaint
-                : _farTreePaint;
+        final Paint treePaint = (treeIndex + groupIndex).isEven
+            ? _farTreeDarkPaint
+            : _farTreePaint;
 
         _drawTree(
           canvas,
@@ -351,30 +275,19 @@ class ParallaxBackgroundComponent extends PositionComponent {
   double _farHillGroundY(double x) {
     const double sectionWidth = 240;
 
-    final double normalized =
-        (x - _drawingStartX) /
-            sectionWidth;
+    final double normalized = (x - _drawingStartX) / sectionWidth;
 
-    final int sectionIndex =
-        normalized.floor();
+    final int sectionIndex = normalized.floor();
 
-    final double progress =
-        normalized - sectionIndex;
+    final double progress = normalized - sectionIndex;
 
-    final double startY =
-        _hillHeight(sectionIndex);
+    final double startY = _hillHeight(sectionIndex);
 
-    final double endY =
-        _hillHeight(sectionIndex + 1);
+    final double endY = _hillHeight(sectionIndex + 1);
 
-    final double smoothProgress =
-        progress *
-        progress *
-        (3 - (2 * progress));
+    final double smoothProgress = progress * progress * (3 - (2 * progress));
 
-    return startY +
-        ((endY - startY) *
-            smoothProgress);
+    return startY + ((endY - startY) * smoothProgress);
   }
 
   double _hillHeight(int index) {
@@ -416,8 +329,7 @@ class ParallaxBackgroundComponent extends PositionComponent {
       264,
     ];
 
-    int wrappedIndex =
-        index % heights.length;
+    int wrappedIndex = index % heights.length;
 
     if (wrappedIndex < 0) {
       wrappedIndex += heights.length;
@@ -434,11 +346,9 @@ class ParallaxBackgroundComponent extends PositionComponent {
     required double width,
     required Paint paint,
   }) {
-    final double trunkHeight =
-        height * 0.25;
+    final double trunkHeight = height * 0.25;
 
-    final double trunkWidth =
-        width * 0.12;
+    final double trunkWidth = width * 0.12;
 
     canvas.drawRect(
       Rect.fromLTWH(
@@ -452,84 +362,44 @@ class ParallaxBackgroundComponent extends PositionComponent {
 
     final Path lowerCrown = Path();
 
-    lowerCrown.moveTo(
-      x,
-      groundY - height,
-    );
+    lowerCrown.moveTo(x, groundY - height);
 
-    lowerCrown.lineTo(
-      x - (width / 2),
-      groundY - (height * 0.10),
-    );
+    lowerCrown.lineTo(x - (width / 2), groundY - (height * 0.10));
 
-    lowerCrown.lineTo(
-      x + (width / 2),
-      groundY - (height * 0.10),
-    );
+    lowerCrown.lineTo(x + (width / 2), groundY - (height * 0.10));
 
     lowerCrown.close();
 
-    canvas.drawPath(
-      lowerCrown,
-      paint,
-    );
+    canvas.drawPath(lowerCrown, paint);
 
     final Path middleCrown = Path();
 
-    middleCrown.moveTo(
-      x,
-      groundY - (height * 1.10),
-    );
+    middleCrown.moveTo(x, groundY - (height * 1.10));
 
-    middleCrown.lineTo(
-      x - (width * 0.39),
-      groundY - (height * 0.39),
-    );
+    middleCrown.lineTo(x - (width * 0.39), groundY - (height * 0.39));
 
-    middleCrown.lineTo(
-      x + (width * 0.39),
-      groundY - (height * 0.39),
-    );
+    middleCrown.lineTo(x + (width * 0.39), groundY - (height * 0.39));
 
     middleCrown.close();
 
-    canvas.drawPath(
-      middleCrown,
-      paint,
-    );
+    canvas.drawPath(middleCrown, paint);
 
     final Path upperCrown = Path();
 
-    upperCrown.moveTo(
-      x,
-      groundY - (height * 1.20),
-    );
+    upperCrown.moveTo(x, groundY - (height * 1.20));
 
-    upperCrown.lineTo(
-      x - (width * 0.27),
-      groundY - (height * 0.66),
-    );
+    upperCrown.lineTo(x - (width * 0.27), groundY - (height * 0.66));
 
-    upperCrown.lineTo(
-      x + (width * 0.27),
-      groundY - (height * 0.66),
-    );
+    upperCrown.lineTo(x + (width * 0.27), groundY - (height * 0.66));
 
     upperCrown.close();
 
-    canvas.drawPath(
-      upperCrown,
-      paint,
-    );
+    canvas.drawPath(upperCrown, paint);
   }
 }
 
 class _TreeGroup {
-  const _TreeGroup(
-    this.startX,
-    this.count,
-    this.spacing,
-  );
+  const _TreeGroup(this.startX, this.count, this.spacing);
 
   final double startX;
   final int count;

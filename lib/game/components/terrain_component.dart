@@ -2,18 +2,11 @@ import 'dart:ui';
 
 import 'package:flame/components.dart';
 
-enum TerrainRoute {
-  safe,
-  risk,
-}
+enum TerrainRoute { safe, risk }
 
 class TerrainComponent extends PositionComponent {
-  TerrainComponent({
-    required this.worldWidth,
-  }) : super(
-          position: Vector2.zero(),
-          size: Vector2(worldWidth, 400),
-        );
+  TerrainComponent({required this.worldWidth})
+    : super(position: Vector2.zero(), size: Vector2(worldWidth, 400));
 
   final double worldWidth;
 
@@ -64,8 +57,7 @@ class TerrainComponent extends PositionComponent {
     Vector2(3600, 300),
   ];
 
-  final Paint _groundPaint = Paint()
-    ..color = const Color(0xFF4D6B35);
+  final Paint _groundPaint = Paint()..color = const Color(0xFF4D6B35);
 
   final Paint _roadPaint = Paint()
     ..color = const Color(0xFF7A6A55)
@@ -84,11 +76,7 @@ class TerrainComponent extends PositionComponent {
         routePoints = _riskRoutePoints;
     }
 
-    return [
-      ..._startPoints,
-      ...routePoints.skip(1),
-      ..._endPoints.skip(1),
-    ];
+    return [..._startPoints, ...routePoints.skip(1), ..._endPoints.skip(1)];
   }
 
   void selectSafeRoute() {
@@ -111,53 +99,29 @@ class TerrainComponent extends PositionComponent {
 
     final Path groundPath = Path();
 
-    groundPath.moveTo(
-      points.first.x,
-      points.first.y,
-    );
+    groundPath.moveTo(points.first.x, points.first.y);
 
     for (final Vector2 point in points.skip(1)) {
-      groundPath.lineTo(
-        point.x,
-        point.y,
-      );
+      groundPath.lineTo(point.x, point.y);
     }
 
-    groundPath.lineTo(
-      worldWidth,
-      size.y,
-    );
+    groundPath.lineTo(worldWidth, size.y);
 
-    groundPath.lineTo(
-      0,
-      size.y,
-    );
+    groundPath.lineTo(0, size.y);
 
     groundPath.close();
 
-    canvas.drawPath(
-      groundPath,
-      _groundPaint,
-    );
+    canvas.drawPath(groundPath, _groundPaint);
 
     final Path roadPath = Path();
 
-    roadPath.moveTo(
-      points.first.x,
-      points.first.y,
-    );
+    roadPath.moveTo(points.first.x, points.first.y);
 
     for (final Vector2 point in points.skip(1)) {
-      roadPath.lineTo(
-        point.x,
-        point.y,
-      );
+      roadPath.lineTo(point.x, point.y);
     }
 
-    canvas.drawPath(
-      roadPath,
-      _roadPaint,
-    );
+    canvas.drawPath(roadPath, _roadPaint);
   }
 
   double getGroundY(double x) {
@@ -176,11 +140,9 @@ class TerrainComponent extends PositionComponent {
       final Vector2 end = points[i + 1];
 
       if (x >= start.x && x <= end.x) {
-        final double progress =
-            (x - start.x) / (end.x - start.x);
+        final double progress = (x - start.x) / (end.x - start.x);
 
-        return start.y +
-            ((end.y - start.y) * progress);
+        return start.y + ((end.y - start.y) * progress);
       }
     }
 
@@ -203,16 +165,11 @@ class TerrainComponent extends PositionComponent {
       final Vector2 end = points[i + 1];
 
       if (x >= start.x && x <= end.x) {
-        final double deltaX =
-            end.x - start.x;
+        final double deltaX = end.x - start.x;
 
-        final double deltaY =
-            end.y - start.y;
+        final double deltaY = end.y - start.y;
 
-        return Offset(
-          deltaX,
-          deltaY,
-        ).direction;
+        return Offset(deltaX, deltaY).direction;
       }
     }
 

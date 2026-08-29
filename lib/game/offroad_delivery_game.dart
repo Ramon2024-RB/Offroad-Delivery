@@ -7,11 +7,7 @@ import 'components/parallax_background_component.dart';
 import 'components/roadside_scenery_component.dart';
 import 'components/terrain_component.dart';
 
-enum DeliveryRoute {
-  none,
-  safe,
-  risk,
-}
+enum DeliveryRoute { none, safe, risk }
 
 class OffroadDeliveryGame extends FlameGame {
   static const double worldWidth = 3600;
@@ -34,16 +30,13 @@ class OffroadDeliveryGame extends FlameGame {
   late final RectangleComponent routeMarker;
   late final TextComponent routeMarkerLabel;
 
-  final ValueNotifier<String> missionNotifier =
-      ValueNotifier<String>(
+  final ValueNotifier<String> missionNotifier = ValueNotifier<String>(
     'Auftrag: Paket beim Depot abholen',
   );
 
-  final ValueNotifier<bool> routeChoiceNotifier =
-      ValueNotifier<bool>(false);
+  final ValueNotifier<bool> routeChoiceNotifier = ValueNotifier<bool>(false);
 
-  final ValueNotifier<String> routeNotifier =
-      ValueNotifier<String>(
+  final ValueNotifier<String> routeNotifier = ValueNotifier<String>(
     'Keine Route gewählt',
   );
 
@@ -54,8 +47,7 @@ class OffroadDeliveryGame extends FlameGame {
   bool _missionCompleted = false;
   bool _routeChoiceShown = false;
 
-  DeliveryRoute _selectedRoute =
-      DeliveryRoute.none;
+  DeliveryRoute _selectedRoute = DeliveryRoute.none;
 
   static const double _acceleration = 420;
   static const double _brakingAcceleration = 600;
@@ -88,47 +80,28 @@ class OffroadDeliveryGame extends FlameGame {
 
     add(camera);
 
-    parallaxBackground =
-        ParallaxBackgroundComponent(
-      worldWidth: worldWidth,
-    );
+    parallaxBackground = ParallaxBackgroundComponent(worldWidth: worldWidth);
 
-    terrain = TerrainComponent(
-      worldWidth: worldWidth,
-    );
+    terrain = TerrainComponent(worldWidth: worldWidth);
 
-    roadsideScenery =
-        RoadsideSceneryComponent(
+    roadsideScenery = RoadsideSceneryComponent(
       terrain: terrain,
       worldWidth: worldWidth,
     );
 
     const double depotX = 60;
 
-    final double depotGroundY =
-        terrain.getGroundY(
-      depotX + 50,
-    );
+    final double depotGroundY = terrain.getGroundY(depotX + 50);
 
     depot = RectangleComponent(
-      position: Vector2(
-        depotX,
-        depotGroundY - 100,
-      ),
-      size: Vector2(
-        100,
-        100,
-      ),
-      paint: Paint()
-        ..color = const Color(0xFF56616A),
+      position: Vector2(depotX, depotGroundY - 100),
+      size: Vector2(100, 100),
+      paint: Paint()..color = const Color(0xFF56616A),
     );
 
     depotLabel = TextComponent(
       text: 'DEPOT',
-      position: Vector2(
-        depotX + 18,
-        depotGroundY - 130,
-      ),
+      position: Vector2(depotX + 18, depotGroundY - 130),
       textRenderer: TextPaint(
         style: const TextStyle(
           color: Colors.white,
@@ -139,45 +112,24 @@ class OffroadDeliveryGame extends FlameGame {
     );
 
     depotCargo = RectangleComponent(
-      position: Vector2(
-        depotX + 55,
-        depotGroundY - 22,
-      ),
-      size: Vector2(
-        26,
-        22,
-      ),
-      paint: Paint()
-        ..color = const Color(0xFFD69A4A),
+      position: Vector2(depotX + 55, depotGroundY - 22),
+      size: Vector2(26, 22),
+      paint: Paint()..color = const Color(0xFFD69A4A),
     );
 
-    const double customerX =
-        worldWidth - 180;
+    const double customerX = worldWidth - 180;
 
-    final double customerGroundY =
-        terrain.getGroundY(
-      customerX + 50,
-    );
+    final double customerGroundY = terrain.getGroundY(customerX + 50);
 
     customer = RectangleComponent(
-      position: Vector2(
-        customerX,
-        customerGroundY - 90,
-      ),
-      size: Vector2(
-        100,
-        90,
-      ),
-      paint: Paint()
-        ..color = const Color(0xFFB66A45),
+      position: Vector2(customerX, customerGroundY - 90),
+      size: Vector2(100, 90),
+      paint: Paint()..color = const Color(0xFFB66A45),
     );
 
     customerLabel = TextComponent(
       text: 'KUNDE',
-      position: Vector2(
-        customerX + 10,
-        customerGroundY - 120,
-      ),
+      position: Vector2(customerX + 10, customerGroundY - 120),
       textRenderer: TextPaint(
         style: const TextStyle(
           color: Colors.white,
@@ -187,30 +139,17 @@ class OffroadDeliveryGame extends FlameGame {
       ),
     );
 
-    final double routeGroundY =
-        terrain.getGroundY(
-      _routeChoiceX,
-    );
+    final double routeGroundY = terrain.getGroundY(_routeChoiceX);
 
     routeMarker = RectangleComponent(
-      position: Vector2(
-        _routeChoiceX,
-        routeGroundY - 70,
-      ),
-      size: Vector2(
-        12,
-        70,
-      ),
-      paint: Paint()
-        ..color = const Color(0xFFFFC107),
+      position: Vector2(_routeChoiceX, routeGroundY - 70),
+      size: Vector2(12, 70),
+      paint: Paint()..color = const Color(0xFFFFC107),
     );
 
     routeMarkerLabel = TextComponent(
       text: 'ROUTENWAHL',
-      position: Vector2(
-        _routeChoiceX - 50,
-        routeGroundY - 100,
-      ),
+      position: Vector2(_routeChoiceX - 50, routeGroundY - 100),
       textRenderer: TextPaint(
         style: const TextStyle(
           color: Colors.white,
@@ -222,16 +161,10 @@ class OffroadDeliveryGame extends FlameGame {
 
     const double vehicleStartX = 185;
 
-    final double vehicleGroundY =
-        terrain.getGroundY(
-      vehicleStartX + 62.5,
-    );
+    final double vehicleGroundY = terrain.getGroundY(vehicleStartX + 62.5);
 
     vehicle = DeliveryVehicle(
-      position: Vector2(
-        vehicleStartX,
-        vehicleGroundY - 65,
-      ),
+      position: Vector2(vehicleStartX, vehicleGroundY - 65),
     );
 
     await gameWorld.addAll([
@@ -251,22 +184,16 @@ class OffroadDeliveryGame extends FlameGame {
     _updateVehicleTerrainPosition();
     _updateParallaxBackground();
 
-    camera.follow(
-      vehicle,
-      horizontalOnly: true,
-      snap: true,
-    );
+    camera.follow(vehicle, horizontalOnly: true, snap: true);
   }
 
   void setThrottle(double value) {
-    if (_routeChoiceShown ||
-        _missionCompleted) {
+    if (_routeChoiceShown || _missionCompleted) {
       _throttle = 0;
       return;
     }
 
-    _throttle =
-        value.clamp(-1.0, 1.0);
+    _throttle = value.clamp(-1.0, 1.0);
   }
 
   void selectSafeRoute() {
@@ -274,8 +201,7 @@ class OffroadDeliveryGame extends FlameGame {
       return;
     }
 
-    _selectedRoute =
-        DeliveryRoute.safe;
+    _selectedRoute = DeliveryRoute.safe;
 
     terrain.selectSafeRoute();
 
@@ -283,8 +209,7 @@ class OffroadDeliveryGame extends FlameGame {
 
     routeChoiceNotifier.value = false;
 
-    routeNotifier.value =
-        'Sichere Route • Belohnung ×1,0';
+    routeNotifier.value = 'Sichere Route • Belohnung ×1,0';
 
     missionNotifier.value =
         'Sichere Route gewählt – bringe die Lieferung zum Kunden!';
@@ -297,8 +222,7 @@ class OffroadDeliveryGame extends FlameGame {
       return;
     }
 
-    _selectedRoute =
-        DeliveryRoute.risk;
+    _selectedRoute = DeliveryRoute.risk;
 
     terrain.selectRiskRoute();
 
@@ -306,11 +230,9 @@ class OffroadDeliveryGame extends FlameGame {
 
     routeChoiceNotifier.value = false;
 
-    routeNotifier.value =
-        'Risikoroute • Belohnung ×1,5';
+    routeNotifier.value = 'Risikoroute • Belohnung ×1,5';
 
-    missionNotifier.value =
-        'Risikoroute gewählt – erhöhte Belohnung!';
+    missionNotifier.value = 'Risikoroute gewählt – erhöhte Belohnung!';
 
     _updateVehicleTerrainPosition();
   }
@@ -319,32 +241,21 @@ class OffroadDeliveryGame extends FlameGame {
   void update(double dt) {
     super.update(dt);
 
-    if (_missionCompleted ||
-        _routeChoiceShown) {
+    if (_missionCompleted || _routeChoiceShown) {
       _applyFriction(dt);
     } else if (_throttle > 0) {
-      _speed +=
-          _acceleration *
-          _throttle *
-          dt;
+      _speed += _acceleration * _throttle * dt;
     } else if (_throttle < 0) {
-      _speed +=
-          _brakingAcceleration *
-          _throttle *
-          dt;
+      _speed += _brakingAcceleration * _throttle * dt;
     } else {
       _applyFriction(dt);
     }
 
     _applySlopeEffect(dt);
 
-    _speed = _speed.clamp(
-      _maximumReverseSpeed,
-      _maximumForwardSpeed,
-    );
+    _speed = _speed.clamp(_maximumReverseSpeed, _maximumForwardSpeed);
 
-    final double movement =
-        _speed * dt;
+    final double movement = _speed * dt;
 
     vehicle.position.x += movement;
 
@@ -358,64 +269,39 @@ class OffroadDeliveryGame extends FlameGame {
   }
 
   void _updateParallaxBackground() {
-    final double vehicleCenterX =
-        vehicle.position.x +
-            (vehicle.size.x / 2);
+    final double vehicleCenterX = vehicle.position.x + (vehicle.size.x / 2);
 
-    parallaxBackground
-        .updateCameraPosition(
-      vehicleCenterX,
-    );
+    parallaxBackground.updateCameraPosition(vehicleCenterX);
   }
 
   void _applySlopeEffect(double dt) {
-    if (_routeChoiceShown ||
-        _missionCompleted) {
+    if (_routeChoiceShown || _missionCompleted) {
       return;
     }
 
-    final double vehicleCenterX =
-        vehicle.position.x +
-            (vehicle.size.x / 2);
+    final double vehicleCenterX = vehicle.position.x + (vehicle.size.x / 2);
 
-    final double groundAngle =
-        terrain.getGroundAngle(
-      vehicleCenterX,
-    );
+    final double groundAngle = terrain.getGroundAngle(vehicleCenterX);
 
-    final double slopeForce =
-        groundAngle *
-            _slopeInfluence;
+    final double slopeForce = groundAngle * _slopeInfluence;
 
     if (_speed > 0) {
-      _speed +=
-          slopeForce * dt;
+      _speed += slopeForce * dt;
     } else if (_speed < 0) {
-      _speed -=
-          slopeForce * dt;
+      _speed -= slopeForce * dt;
     }
   }
 
   void _updateVehicleTerrainPosition() {
-    final double vehicleCenterX =
-        vehicle.position.x +
-            (vehicle.size.x / 2);
+    final double vehicleCenterX = vehicle.position.x + (vehicle.size.x / 2);
 
-    final double groundY =
-        terrain.getGroundY(
-      vehicleCenterX,
-    );
+    final double groundY = terrain.getGroundY(vehicleCenterX);
 
-    final double groundAngle =
-        terrain.getGroundAngle(
-      vehicleCenterX,
-    );
+    final double groundAngle = terrain.getGroundAngle(vehicleCenterX);
 
-    vehicle.position.y =
-        groundY - 65;
+    vehicle.position.y = groundY - 65;
 
-    vehicle.angle =
-        groundAngle;
+    vehicle.angle = groundAngle;
   }
 
   void _checkCargoPickup() {
@@ -430,8 +316,7 @@ class OffroadDeliveryGame extends FlameGame {
 
       vehicle.showCargo();
 
-      missionNotifier.value =
-          'Lieferung geladen – bringe sie zum Kunden!';
+      missionNotifier.value = 'Lieferung geladen – bringe sie zum Kunden!';
     }
   }
 
@@ -439,35 +324,28 @@ class OffroadDeliveryGame extends FlameGame {
     if (!_cargoLoaded ||
         _missionCompleted ||
         _routeChoiceShown ||
-        _selectedRoute !=
-            DeliveryRoute.none) {
+        _selectedRoute != DeliveryRoute.none) {
       return;
     }
 
-    if (vehicle.position.x >=
-        _routeChoiceX - 180) {
+    if (vehicle.position.x >= _routeChoiceX - 180) {
       _routeChoiceShown = true;
 
       _throttle = 0;
       _speed = 0;
 
-      routeChoiceNotifier.value =
-          true;
+      routeChoiceNotifier.value = true;
 
-      missionNotifier.value =
-          'ROUTENWAHL – welchen Weg möchtest du nehmen?';
+      missionNotifier.value = 'ROUTENWAHL – welchen Weg möchtest du nehmen?';
     }
   }
 
   void _checkMissionCompletion() {
-    if (!_cargoLoaded ||
-        _missionCompleted) {
+    if (!_cargoLoaded || _missionCompleted) {
       return;
     }
 
-    if (vehicle.position.x +
-            vehicle.size.x >=
-        customer.position.x) {
+    if (vehicle.position.x + vehicle.size.x >= customer.position.x) {
       _missionCompleted = true;
 
       _throttle = 0;
@@ -483,22 +361,19 @@ class OffroadDeliveryGame extends FlameGame {
           reward = 100;
       }
 
-      missionNotifier.value =
-          'LIEFERUNG ERFOLGREICH! +$reward €';
+      missionNotifier.value = 'LIEFERUNG ERFOLGREICH! +$reward €';
     }
   }
 
   void _applyFriction(double dt) {
     if (_speed > 0) {
-      _speed -=
-          _friction * dt;
+      _speed -= _friction * dt;
 
       if (_speed < 0) {
         _speed = 0;
       }
     } else if (_speed < 0) {
-      _speed +=
-          _friction * dt;
+      _speed += _friction * dt;
 
       if (_speed > 0) {
         _speed = 0;
@@ -509,23 +384,16 @@ class OffroadDeliveryGame extends FlameGame {
   void _keepVehicleInsideWorld() {
     const double minimumX = 20;
 
-    final double maximumX =
-        worldWidth -
-            vehicle.size.x -
-            20;
+    final double maximumX = worldWidth - vehicle.size.x - 20;
 
-    if (vehicle.position.x <
-        minimumX) {
-      vehicle.position.x =
-          minimumX;
+    if (vehicle.position.x < minimumX) {
+      vehicle.position.x = minimumX;
 
       _speed = 0;
     }
 
-    if (vehicle.position.x >
-        maximumX) {
-      vehicle.position.x =
-          maximumX;
+    if (vehicle.position.x > maximumX) {
+      vehicle.position.x = maximumX;
 
       _speed = 0;
     }

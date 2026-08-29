@@ -6,27 +6,16 @@ import 'components/physics_vehicle.dart';
 import 'components/physics_wheel.dart';
 
 class PhysicsTestGame extends Forge2DGame {
-  PhysicsTestGame({
-    this.onCargoPickedUp,
-    this.onDeliveryCompleted,
-  }) : super(
-          gravity: Vector2(
-            0,
-            9.81,
-          ),
-          metersToPixels: 32,
-          camera: CameraComponent.withFixedResolution(
-            width: 900,
-            height: 400,
-          ),
-        );
+  PhysicsTestGame({this.onCargoPickedUp, this.onDeliveryCompleted})
+    : super(
+        gravity: Vector2(0, 9.81),
+        metersToPixels: 32,
+        camera: CameraComponent.withFixedResolution(width: 900, height: 400),
+      );
 
   final VoidCallback? onCargoPickedUp;
 
-  final void Function(
-    int moneyReward,
-    int xpReward,
-  )? onDeliveryCompleted;
+  final void Function(int moneyReward, int xpReward)? onDeliveryCompleted;
 
   late final PhysicsVehicle vehicle;
   late final PhysicsWheel rearWheel;
@@ -66,8 +55,7 @@ class PhysicsTestGame extends Forge2DGame {
 
   static const double _deliveryHouseX = 125.0;
 
-  static const double _deliveryZoneCenterX =
-      _deliveryHouseX - 3.0;
+  static const double _deliveryZoneCenterX = _deliveryHouseX - 3.0;
 
   static const double _deliveryZoneHalfWidth = 2.0;
 
@@ -82,47 +70,26 @@ class PhysicsTestGame extends Forge2DGame {
   Future<void> onLoad() async {
     await super.onLoad();
 
-    final PhysicsLandscape landscape =
-        PhysicsLandscape();
+    final PhysicsLandscape landscape = PhysicsLandscape();
 
-    final PhysicsTerrain terrain =
-        PhysicsTerrain();
+    final PhysicsTerrain terrain = PhysicsTerrain();
 
-    final PickupStation pickupStation =
-        PickupStation(
-      position: Vector2(
-        _pickupX,
-        7.0,
-      ),
+    final PickupStation pickupStation = PickupStation(
+      position: Vector2(_pickupX, 7.0),
     );
 
-    final DeliveryHouse deliveryHouse =
-        DeliveryHouse(
-      position: Vector2(
-        _deliveryHouseX,
-        6.6,
-      ),
+    final DeliveryHouse deliveryHouse = DeliveryHouse(
+      position: Vector2(_deliveryHouseX, 6.6),
     );
 
-    vehicle = PhysicsVehicle(
-      startPosition: Vector2(
-        8,
-        5,
-      ),
-    );
+    vehicle = PhysicsVehicle(startPosition: Vector2(8, 5));
 
     rearWheel = PhysicsWheel(
-      startPosition: Vector2(
-        8 + _rearWheelX,
-        5 + _wheelY,
-      ),
+      startPosition: Vector2(8 + _rearWheelX, 5 + _wheelY),
     );
 
     frontWheel = PhysicsWheel(
-      startPosition: Vector2(
-        8 + _frontWheelX,
-        5 + _wheelY,
-      ),
+      startPosition: Vector2(8 + _frontWheelX, 5 + _wheelY),
     );
 
     await world.add(landscape);
@@ -135,10 +102,7 @@ class PhysicsTestGame extends Forge2DGame {
 
     _createSuspension();
 
-    camera.viewfinder.position = Vector2(
-      12,
-      6,
-    );
+    camera.viewfinder.position = Vector2(12, 6);
   }
 
   @override
@@ -149,16 +113,11 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    final double vehicleX =
-        vehicle.body.position.x;
+    final double vehicleX = vehicle.body.position.x;
 
-    final double vehicleY =
-        vehicle.body.position.y;
+    final double vehicleY = vehicle.body.position.y;
 
-    camera.viewfinder.position = Vector2(
-      vehicleX + 5,
-      vehicleY + 0.5,
-    );
+    camera.viewfinder.position = Vector2(vehicleX + 5, vehicleY + 0.5);
 
     _updateDrivePhysics(dt);
 
@@ -168,8 +127,7 @@ class PhysicsTestGame extends Forge2DGame {
   }
 
   void _updateDrivePhysics(double dt) {
-    final double horizontalSpeed =
-        vehicle.body.linearVelocity.x;
+    final double horizontalSpeed = vehicle.body.linearVelocity.x;
 
     // ------------------------------------------
     // KEIN PEDAL:
@@ -179,10 +137,7 @@ class PhysicsTestGame extends Forge2DGame {
     if (_throttle == 0) {
       rearWheelJoint.motorSpeed = 0;
 
-      _applyHorizontalBrake(
-        _coastBrakeStrength,
-        dt,
-      );
+      _applyHorizontalBrake(_coastBrakeStrength, dt);
 
       return;
     }
@@ -194,22 +149,17 @@ class PhysicsTestGame extends Forge2DGame {
     if (_throttle > 0) {
       // Wir rollen noch deutlich rückwärts:
       // erst abbremsen.
-      if (horizontalSpeed <
-          -_directionChangeSpeed) {
+      if (horizontalSpeed < -_directionChangeSpeed) {
         rearWheelJoint.motorSpeed = 0;
 
-        _applyHorizontalBrake(
-          _brakeStrength,
-          dt,
-        );
+        _applyHorizontalBrake(_brakeStrength, dt);
 
         return;
       }
 
       // Fast Stillstand oder bereits vorwärts:
       // normal Gas geben.
-      rearWheelJoint.motorSpeed =
-          _motorSpeed;
+      rearWheelJoint.motorSpeed = _motorSpeed;
 
       return;
     }
@@ -221,70 +171,48 @@ class PhysicsTestGame extends Forge2DGame {
     if (_throttle < 0) {
       // Wir fahren noch deutlich vorwärts:
       // zuerst kräftig abbremsen.
-      if (horizontalSpeed >
-          _directionChangeSpeed) {
+      if (horizontalSpeed > _directionChangeSpeed) {
         rearWheelJoint.motorSpeed = 0;
 
-        _applyHorizontalBrake(
-          _brakeStrength,
-          dt,
-        );
+        _applyHorizontalBrake(_brakeStrength, dt);
 
         return;
       }
 
       // Fast Stillstand oder bereits rückwärts:
       // Rückwärtsgang.
-      rearWheelJoint.motorSpeed =
-          -_motorSpeed;
+      rearWheelJoint.motorSpeed = -_motorSpeed;
     }
   }
 
-  void _applyHorizontalBrake(
-    double strength,
-    double dt,
-  ) {
-    final Vector2 velocity =
-        vehicle.body.linearVelocity;
+  void _applyHorizontalBrake(double strength, double dt) {
+    final Vector2 velocity = vehicle.body.linearVelocity;
 
-    final double horizontalSpeed =
-        velocity.x;
+    final double horizontalSpeed = velocity.x;
 
     if (horizontalSpeed.abs() < 0.05) {
-      vehicle.body.linearVelocity = Vector2(
-        0,
-        velocity.y,
-      );
+      vehicle.body.linearVelocity = Vector2(0, velocity.y);
 
       return;
     }
 
-    final double brakingAmount =
-        strength * dt;
+    final double brakingAmount = strength * dt;
 
-    double newHorizontalSpeed =
-        horizontalSpeed;
+    double newHorizontalSpeed = horizontalSpeed;
 
     if (horizontalSpeed > 0) {
-      newHorizontalSpeed =
-          (horizontalSpeed - brakingAmount)
-              .clamp(
-                0.0,
-                double.infinity,
-              );
+      newHorizontalSpeed = (horizontalSpeed - brakingAmount).clamp(
+        0.0,
+        double.infinity,
+      );
     } else {
-      newHorizontalSpeed =
-          (horizontalSpeed + brakingAmount)
-              .clamp(
-                double.negativeInfinity,
-                0.0,
-              );
+      newHorizontalSpeed = (horizontalSpeed + brakingAmount).clamp(
+        double.negativeInfinity,
+        0.0,
+      );
     }
 
-    vehicle.body.linearVelocity = Vector2(
-      newHorizontalSpeed,
-      velocity.y,
-    );
+    vehicle.body.linearVelocity = Vector2(newHorizontalSpeed, velocity.y);
   }
 
   void _checkPickup(double vehicleX) {
@@ -292,8 +220,7 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    if (vehicleX >= _pickupX - 1.5 &&
-        vehicleX <= _pickupX + 1.5) {
+    if (vehicleX >= _pickupX - 1.5 && vehicleX <= _pickupX + 1.5) {
       _cargoPickedUp = true;
 
       vehicle.showCargo();
@@ -312,12 +239,8 @@ class PhysicsTestGame extends Forge2DGame {
     }
 
     final bool insideDeliveryZone =
-        vehicleX >=
-                _deliveryZoneCenterX -
-                    _deliveryZoneHalfWidth &&
-            vehicleX <=
-                _deliveryZoneCenterX +
-                    _deliveryZoneHalfWidth;
+        vehicleX >= _deliveryZoneCenterX - _deliveryZoneHalfWidth &&
+        vehicleX <= _deliveryZoneCenterX + _deliveryZoneHalfWidth;
 
     if (!insideDeliveryZone) {
       return;
@@ -327,8 +250,7 @@ class PhysicsTestGame extends Forge2DGame {
     // ob der Pickup horizontal fast steht.
     // Federbewegungen nach oben/unten sollen die
     // Ablieferung nicht verhindern.
-    final double speed =
-        vehicle.body.linearVelocity.x.abs();
+    final double speed = vehicle.body.linearVelocity.x.abs();
 
     if (speed > _deliveryMaxSpeed) {
       return;
@@ -348,26 +270,16 @@ class PhysicsTestGame extends Forge2DGame {
     money += moneyReward;
     xp += xpReward;
 
-    onDeliveryCompleted?.call(
-      moneyReward,
-      xpReward,
-    );
+    onDeliveryCompleted?.call(moneyReward, xpReward);
   }
 
   void _createSuspension() {
-    final WheelJointDef rearJointDef =
-        WheelJointDef(
+    final WheelJointDef rearJointDef = WheelJointDef(
       bodyA: vehicle.body,
       bodyB: rearWheel.body,
-      localAnchorA: Vector2(
-        _rearWheelX,
-        _wheelY,
-      ),
+      localAnchorA: Vector2(_rearWheelX, _wheelY),
       localAnchorB: Vector2.zero(),
-      localAxisA: Vector2(
-        0,
-        1,
-      ),
+      localAxisA: Vector2(0, 1),
       enableSpring: true,
       hertz: 4.5,
       dampingRatio: 0.75,
@@ -379,19 +291,12 @@ class PhysicsTestGame extends Forge2DGame {
       motorSpeed: 0,
     );
 
-    final WheelJointDef frontJointDef =
-        WheelJointDef(
+    final WheelJointDef frontJointDef = WheelJointDef(
       bodyA: vehicle.body,
       bodyB: frontWheel.body,
-      localAnchorA: Vector2(
-        _frontWheelX,
-        _wheelY,
-      ),
+      localAnchorA: Vector2(_frontWheelX, _wheelY),
       localAnchorB: Vector2.zero(),
-      localAxisA: Vector2(
-        0,
-        1,
-      ),
+      localAxisA: Vector2(0, 1),
       enableSpring: true,
       hertz: 4.5,
       dampingRatio: 0.75,
@@ -401,22 +306,13 @@ class PhysicsTestGame extends Forge2DGame {
       enableMotor: false,
     );
 
-    rearWheelJoint =
-        world.physicsWorld.createWheelJoint(
-      rearJointDef,
-    );
+    rearWheelJoint = world.physicsWorld.createWheelJoint(rearJointDef);
 
-    frontWheelJoint =
-        world.physicsWorld.createWheelJoint(
-      frontJointDef,
-    );
+    frontWheelJoint = world.physicsWorld.createWheelJoint(frontJointDef);
   }
 
   void setThrottle(double value) {
-    _throttle = value.clamp(
-      -1.0,
-      1.0,
-    );
+    _throttle = value.clamp(-1.0, 1.0);
   }
 }
 
@@ -425,83 +321,43 @@ class PhysicsTestGame extends Forge2DGame {
 // ----------------------------------------------------
 
 class PickupStation extends PositionComponent {
-  PickupStation({
-    required super.position,
-  }) : super(
-          priority: 5,
-        );
+  PickupStation({required super.position}) : super(priority: 5);
 
-  final Paint _postPaint = Paint()
-    ..color = const Color(0xFF4A4F52);
+  final Paint _postPaint = Paint()..color = const Color(0xFF4A4F52);
 
-  final Paint _signPaint = Paint()
-    ..color = const Color(0xFFF2B84B);
+  final Paint _signPaint = Paint()..color = const Color(0xFFF2B84B);
 
   final Paint _signBorderPaint = Paint()
     ..color = const Color(0xFF5C4520)
     ..style = PaintingStyle.stroke
     ..strokeWidth = 0.08;
 
-  final Paint _boxPaint = Paint()
-    ..color = const Color(0xFFD9903D);
+  final Paint _boxPaint = Paint()..color = const Color(0xFFD9903D);
 
-  final Paint _boxTapePaint = Paint()
-    ..color = const Color(0xFFFFD080);
+  final Paint _boxTapePaint = Paint()..color = const Color(0xFFFFD080);
 
   @override
   void render(Canvas canvas) {
     super.render(canvas);
 
-    canvas.drawRect(
-      const Rect.fromLTWH(
-        -0.08,
-        -2.0,
-        0.16,
-        2.0,
-      ),
-      _postPaint,
-    );
+    canvas.drawRect(const Rect.fromLTWH(-0.08, -2.0, 0.16, 2.0), _postPaint);
 
-    const Rect signRect = Rect.fromLTWH(
-      -1.05,
-      -3.0,
-      2.1,
-      1.0,
-    );
+    const Rect signRect = Rect.fromLTWH(-1.05, -3.0, 2.1, 1.0);
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        signRect,
-        const Radius.circular(0.12),
-      ),
+      RRect.fromRectAndRadius(signRect, const Radius.circular(0.12)),
       _signPaint,
     );
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        signRect,
-        const Radius.circular(0.12),
-      ),
+      RRect.fromRectAndRadius(signRect, const Radius.circular(0.12)),
       _signBorderPaint,
     );
 
-    canvas.drawRect(
-      const Rect.fromLTWH(
-        -0.55,
-        -0.75,
-        1.1,
-        0.75,
-      ),
-      _boxPaint,
-    );
+    canvas.drawRect(const Rect.fromLTWH(-0.55, -0.75, 1.1, 0.75), _boxPaint);
 
     canvas.drawRect(
-      const Rect.fromLTWH(
-        -0.08,
-        -0.75,
-        0.16,
-        0.75,
-      ),
+      const Rect.fromLTWH(-0.08, -0.75, 0.16, 0.75),
       _boxTapePaint,
     );
   }
@@ -512,49 +368,35 @@ class PickupStation extends PositionComponent {
 // ----------------------------------------------------
 
 class DeliveryHouse extends PositionComponent {
-  DeliveryHouse({
-    required super.position,
-  }) : super(
-          priority: 4,
-        );
+  DeliveryHouse({required super.position}) : super(priority: 4);
 
-  final Paint _wallPaint = Paint()
-    ..color = const Color(0xFFD7C5A2);
+  final Paint _wallPaint = Paint()..color = const Color(0xFFD7C5A2);
 
-  final Paint _wallShadowPaint = Paint()
-    ..color = const Color(0xFFB49B74);
+  final Paint _wallShadowPaint = Paint()..color = const Color(0xFFB49B74);
 
-  final Paint _roofPaint = Paint()
-    ..color = const Color(0xFF67463A);
+  final Paint _roofPaint = Paint()..color = const Color(0xFF67463A);
 
-  final Paint _roofShadowPaint = Paint()
-    ..color = const Color(0xFF4E342D);
+  final Paint _roofShadowPaint = Paint()..color = const Color(0xFF4E342D);
 
-  final Paint _doorPaint = Paint()
-    ..color = const Color(0xFF76513B);
+  final Paint _doorPaint = Paint()..color = const Color(0xFF76513B);
 
-  final Paint _windowPaint = Paint()
-    ..color = const Color(0xFF8CC5DA);
+  final Paint _windowPaint = Paint()..color = const Color(0xFF8CC5DA);
 
   final Paint _windowFramePaint = Paint()
     ..color = const Color(0xFFF1E4C8)
     ..style = PaintingStyle.stroke
     ..strokeWidth = 0.08;
 
-  final Paint _chimneyPaint = Paint()
-    ..color = const Color(0xFF73584A);
+  final Paint _chimneyPaint = Paint()..color = const Color(0xFF73584A);
 
-  final Paint _stonePaint = Paint()
-    ..color = const Color(0xFF7A756B);
+  final Paint _stonePaint = Paint()..color = const Color(0xFF7A756B);
 
-  final Paint _deliveryZonePaint = Paint()
-    ..color = const Color(0x66F4D35E);
+  final Paint _deliveryZonePaint = Paint()..color = const Color(0x66F4D35E);
 
-  final Paint _deliveryZoneBorderPaint =
-      Paint()
-        ..color = const Color(0xFFD9B83E)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.09;
+  final Paint _deliveryZoneBorderPaint = Paint()
+    ..color = const Color(0xFFD9B83E)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.09;
 
   @override
   void render(Canvas canvas) {
@@ -565,61 +407,32 @@ class DeliveryHouse extends PositionComponent {
   }
 
   void _drawDeliveryZone(Canvas canvas) {
-    const Rect zone = Rect.fromLTWH(
-      -4.6,
-      0.05,
-      3.2,
-      0.45,
-    );
+    const Rect zone = Rect.fromLTWH(-4.6, 0.05, 3.2, 0.45);
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        zone,
-        const Radius.circular(0.15),
-      ),
+      RRect.fromRectAndRadius(zone, const Radius.circular(0.15)),
       _deliveryZonePaint,
     );
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        zone,
-        const Radius.circular(0.15),
-      ),
+      RRect.fromRectAndRadius(zone, const Radius.circular(0.15)),
       _deliveryZoneBorderPaint,
     );
   }
 
   void _drawHouse(Canvas canvas) {
-    canvas.drawRect(
-      const Rect.fromLTWH(
-        -1.35,
-        -0.20,
-        4.9,
-        0.28,
-      ),
-      _stonePaint,
-    );
+    canvas.drawRect(const Rect.fromLTWH(-1.35, -0.20, 4.9, 0.28), _stonePaint);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        const Rect.fromLTWH(
-          -1.1,
-          -3.1,
-          4.4,
-          3.0,
-        ),
+        const Rect.fromLTWH(-1.1, -3.1, 4.4, 3.0),
         const Radius.circular(0.08),
       ),
       _wallPaint,
     );
 
     canvas.drawRect(
-      const Rect.fromLTWH(
-        2.85,
-        -3.0,
-        0.45,
-        2.9,
-      ),
+      const Rect.fromLTWH(2.85, -3.0, 0.45, 2.9),
       _wallShadowPaint,
     );
 
@@ -629,10 +442,7 @@ class DeliveryHouse extends PositionComponent {
       ..lineTo(3.75, -3.0)
       ..close();
 
-    canvas.drawPath(
-      roof,
-      _roofPaint,
-    );
+    canvas.drawPath(roof, _roofPaint);
 
     final Paint roofEdgePaint = Paint()
       ..color = const Color(0xFF4E342D)
@@ -646,120 +456,53 @@ class DeliveryHouse extends PositionComponent {
       ..lineTo(0.85, -5.12)
       ..lineTo(3.85, -2.98);
 
-    canvas.drawPath(
-      roofEdge,
-      roofEdgePaint,
-    );
+    canvas.drawPath(roofEdge, roofEdgePaint);
 
     canvas.drawRect(
-      const Rect.fromLTWH(
-        2.15,
-        -4.65,
-        0.48,
-        1.25,
-      ),
+      const Rect.fromLTWH(2.15, -4.65, 0.48, 1.25),
       _chimneyPaint,
     );
 
     canvas.drawRect(
-      const Rect.fromLTWH(
-        2.05,
-        -4.72,
-        0.68,
-        0.18,
-      ),
+      const Rect.fromLTWH(2.05, -4.72, 0.68, 0.18),
       _roofShadowPaint,
     );
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        const Rect.fromLTWH(
-          1.45,
-          -2.15,
-          0.85,
-          2.05,
-        ),
+        const Rect.fromLTWH(1.45, -2.15, 0.85, 2.05),
         const Radius.circular(0.07),
       ),
       _doorPaint,
     );
 
-    canvas.drawCircle(
-      const Offset(
-        2.10,
-        -1.05,
-      ),
-      0.07,
-      _roofShadowPaint,
-    );
+    canvas.drawCircle(const Offset(2.10, -1.05), 0.07, _roofShadowPaint);
 
-    _drawWindow(
-      canvas,
-      -0.55,
-      -2.25,
-    );
+    _drawWindow(canvas, -0.55, -2.25);
 
-    _drawWindow(
-      canvas,
-      2.45,
-      -2.25,
-    );
+    _drawWindow(canvas, 2.45, -2.25);
 
     for (int i = 0; i < 7; i++) {
-      canvas.drawCircle(
-        Offset(
-          -0.85 + (i * 0.55),
-          -0.05,
-        ),
-        0.13,
-        _stonePaint,
-      );
+      canvas.drawCircle(Offset(-0.85 + (i * 0.55), -0.05), 0.13, _stonePaint);
     }
   }
 
-  void _drawWindow(
-    Canvas canvas,
-    double x,
-    double y,
-  ) {
-    final Rect window = Rect.fromLTWH(
-      x,
-      y,
-      0.78,
-      0.82,
-    );
+  void _drawWindow(Canvas canvas, double x, double y) {
+    final Rect window = Rect.fromLTWH(x, y, 0.78, 0.82);
 
-    canvas.drawRect(
-      window,
-      _windowPaint,
-    );
+    canvas.drawRect(window, _windowPaint);
 
-    canvas.drawRect(
-      window,
+    canvas.drawRect(window, _windowFramePaint);
+
+    canvas.drawLine(
+      Offset(x + 0.39, y),
+      Offset(x + 0.39, y + 0.82),
       _windowFramePaint,
     );
 
     canvas.drawLine(
-      Offset(
-        x + 0.39,
-        y,
-      ),
-      Offset(
-        x + 0.39,
-        y + 0.82,
-      ),
-      _windowFramePaint,
-    );
-
-    canvas.drawLine(
-      Offset(
-        x,
-        y + 0.41,
-      ),
-      Offset(
-        x + 0.78,
-        y + 0.41,
-      ),
+      Offset(x, y + 0.41),
+      Offset(x + 0.78, y + 0.41),
       _windowFramePaint,
     );
   }
@@ -770,25 +513,17 @@ class DeliveryHouse extends PositionComponent {
 // ----------------------------------------------------
 
 class PhysicsLandscape extends PositionComponent {
-  PhysicsLandscape()
-      : super(
-          priority: -100,
-        );
+  PhysicsLandscape() : super(priority: -100);
 
-  final Paint _farMountainPaint = Paint()
-    ..color = const Color(0xFF9DB4BD);
+  final Paint _farMountainPaint = Paint()..color = const Color(0xFF9DB4BD);
 
-  final Paint _middleMountainPaint = Paint()
-    ..color = const Color(0xFF78949B);
+  final Paint _middleMountainPaint = Paint()..color = const Color(0xFF78949B);
 
-  final Paint _hillPaint = Paint()
-    ..color = const Color(0xFF587D57);
+  final Paint _hillPaint = Paint()..color = const Color(0xFF587D57);
 
-  final Paint _forestPaint = Paint()
-    ..color = const Color(0xFF3D6748);
+  final Paint _forestPaint = Paint()..color = const Color(0xFF3D6748);
 
-  final Paint _trunkPaint = Paint()
-    ..color = const Color(0xFF4B4334);
+  final Paint _trunkPaint = Paint()..color = const Color(0xFF4B4334);
 
   @override
   void render(Canvas canvas) {
@@ -825,10 +560,7 @@ class PhysicsLandscape extends PositionComponent {
       ..lineTo(190, 9)
       ..close();
 
-    canvas.drawPath(
-      path,
-      _farMountainPaint,
-    );
+    canvas.drawPath(path, _farMountainPaint);
   }
 
   void _drawMiddleMountains(Canvas canvas) {
@@ -847,10 +579,7 @@ class PhysicsLandscape extends PositionComponent {
       ..lineTo(190, 9)
       ..close();
 
-    canvas.drawPath(
-      path,
-      _middleMountainPaint,
-    );
+    canvas.drawPath(path, _middleMountainPaint);
   }
 
   void _drawHills(Canvas canvas) {
@@ -868,43 +597,23 @@ class PhysicsLandscape extends PositionComponent {
       ..lineTo(190, 10)
       ..close();
 
-    canvas.drawPath(
-      path,
-      _hillPaint,
-    );
+    canvas.drawPath(path, _hillPaint);
   }
 
   void _drawForest(Canvas canvas) {
-    for (double x = -35;
-        x < 190;
-        x += 3.4) {
-      final int index =
-          ((x + 35) / 3.4).round();
+    for (double x = -35; x < 190; x += 3.4) {
+      final int index = ((x + 35) / 3.4).round();
 
-      final double variation =
-          (index % 4) * 0.18;
+      final double variation = (index % 4) * 0.18;
 
-      _drawTree(
-        canvas,
-        x,
-        6.6 + variation,
-        1.0 + ((index % 3) * 0.12),
-      );
+      _drawTree(canvas, x, 6.6 + variation, 1.0 + ((index % 3) * 0.12));
     }
   }
 
-  void _drawTree(
-    Canvas canvas,
-    double x,
-    double y,
-    double scale,
-  ) {
+  void _drawTree(Canvas canvas, double x, double y, double scale) {
     canvas.drawRect(
       Rect.fromCenter(
-        center: Offset(
-          x,
-          y - (0.45 * scale),
-        ),
+        center: Offset(x, y - (0.45 * scale)),
         width: 0.12 * scale,
         height: 0.9 * scale,
       ),
@@ -912,40 +621,16 @@ class PhysicsLandscape extends PositionComponent {
     );
 
     final Path tree = Path()
-      ..moveTo(
-        x,
-        y - (2.0 * scale),
-      )
-      ..lineTo(
-        x - (0.65 * scale),
-        y - (0.65 * scale),
-      )
-      ..lineTo(
-        x - (0.35 * scale),
-        y - (0.65 * scale),
-      )
-      ..lineTo(
-        x - (0.85 * scale),
-        y,
-      )
-      ..lineTo(
-        x + (0.85 * scale),
-        y,
-      )
-      ..lineTo(
-        x + (0.35 * scale),
-        y - (0.65 * scale),
-      )
-      ..lineTo(
-        x + (0.65 * scale),
-        y - (0.65 * scale),
-      )
+      ..moveTo(x, y - (2.0 * scale))
+      ..lineTo(x - (0.65 * scale), y - (0.65 * scale))
+      ..lineTo(x - (0.35 * scale), y - (0.65 * scale))
+      ..lineTo(x - (0.85 * scale), y)
+      ..lineTo(x + (0.85 * scale), y)
+      ..lineTo(x + (0.35 * scale), y - (0.65 * scale))
+      ..lineTo(x + (0.65 * scale), y - (0.65 * scale))
       ..close();
 
-    canvas.drawPath(
-      tree,
-      _forestPaint,
-    );
+    canvas.drawPath(tree, _forestPaint);
   }
 }
 
@@ -954,13 +639,9 @@ class PhysicsLandscape extends PositionComponent {
 // ----------------------------------------------------
 
 class PhysicsTerrain extends BodyComponent {
-  PhysicsTerrain()
-      : super(
-          renderBody: false,
-        );
+  PhysicsTerrain() : super(renderBody: false);
 
-  final Paint _groundPaint = Paint()
-    ..color = const Color(0xFF506F38);
+  final Paint _groundPaint = Paint()..color = const Color(0xFF506F38);
 
   final Paint _roadPaint = Paint()
     ..color = const Color(0xFF756650)
@@ -1009,27 +690,13 @@ class PhysicsTerrain extends BodyComponent {
       position: Vector2.zero(),
     );
 
-    final Body terrainBody =
-        world.createBody(
-      bodyDef,
-    );
+    final Body terrainBody = world.createBody(bodyDef);
 
-    final List<Vector2> collisionPoints =
-        _points
-            .map(
-              (point) => Vector2(
-                point.x,
-                point.y,
-              ),
-            )
-            .toList();
+    final List<Vector2> collisionPoints = _points
+        .map((point) => Vector2(point.x, point.y))
+        .toList();
 
-    terrainBody.createChain(
-      ChainDef(
-        points: collisionPoints,
-        isLoop: false,
-      ),
-    );
+    terrainBody.createChain(ChainDef(points: collisionPoints, isLoop: false));
 
     return terrainBody;
   }
@@ -1038,55 +705,25 @@ class PhysicsTerrain extends BodyComponent {
   void render(Canvas canvas) {
     super.render(canvas);
 
-    final Path groundPath = Path()
-      ..moveTo(
-        _points.first.x,
-        _points.first.y,
-      );
+    final Path groundPath = Path()..moveTo(_points.first.x, _points.first.y);
 
-    for (int i = 1;
-        i < _points.length;
-        i++) {
-      groundPath.lineTo(
-        _points[i].x,
-        _points[i].y,
-      );
+    for (int i = 1; i < _points.length; i++) {
+      groundPath.lineTo(_points[i].x, _points[i].y);
     }
 
     groundPath
-      ..lineTo(
-        _points.last.x,
-        20,
-      )
-      ..lineTo(
-        _points.first.x,
-        20,
-      )
+      ..lineTo(_points.last.x, 20)
+      ..lineTo(_points.first.x, 20)
       ..close();
 
-    canvas.drawPath(
-      groundPath,
-      _groundPaint,
-    );
+    canvas.drawPath(groundPath, _groundPaint);
 
-    final Path roadPath = Path()
-      ..moveTo(
-        _points.first.x,
-        _points.first.y,
-      );
+    final Path roadPath = Path()..moveTo(_points.first.x, _points.first.y);
 
-    for (int i = 1;
-        i < _points.length;
-        i++) {
-      roadPath.lineTo(
-        _points[i].x,
-        _points[i].y,
-      );
+    for (int i = 1; i < _points.length; i++) {
+      roadPath.lineTo(_points[i].x, _points[i].y);
     }
 
-    canvas.drawPath(
-      roadPath,
-      _roadPaint,
-    );
+    canvas.drawPath(roadPath, _roadPaint);
   }
 }

@@ -2,28 +2,25 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../game/physics_test_game.dart';
+import '../progress/player_progress_controller.dart';
 
 class GamePage extends StatefulWidget {
-  const GamePage({super.key});
+  const GamePage({required this.progressController, super.key});
+
+  final PlayerProgressController progressController;
 
   @override
-  State<GamePage> createState() =>
-      _GamePageState();
+  State<GamePage> createState() => _GamePageState();
 }
 
 class _GamePageState extends State<GamePage> {
   late final PhysicsTestGame _game;
 
-  String _missionText =
-      'Fahre zur Abholstation';
+  String _missionText = 'Fahre zur Abholstation';
 
-  IconData _missionIcon =
-      Icons.inventory_2_rounded;
+  IconData _missionIcon = Icons.inventory_2_rounded;
 
   bool _showDeliveryCompleted = false;
-
-  int _money = 0;
-  int _xp = 0;
 
   int _moneyReward = 0;
   int _xpReward = 0;
@@ -32,6 +29,8 @@ class _GamePageState extends State<GamePage> {
   void initState() {
     super.initState();
 
+    widget.progressController.addListener(_onProgressChanged);
+
     _game = PhysicsTestGame(
       onCargoPickedUp: () {
         if (!mounted) {
@@ -39,37 +38,51 @@ class _GamePageState extends State<GamePage> {
         }
 
         setState(() {
-          _missionText =
-              'Paket geladen – fahre zum Kunden';
+          _missionText = 'Paket geladen – fahre zum Kunden';
 
-          _missionIcon =
-              Icons.local_shipping_rounded;
+          _missionIcon = Icons.local_shipping_rounded;
         });
       },
-      onDeliveryCompleted: (
-        int moneyReward,
-        int xpReward,
-      ) {
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _moneyReward = moneyReward;
-          _xpReward = xpReward;
-
-          _money += moneyReward;
-          _xp += xpReward;
-
-          _missionText =
-              'Lieferung abgeschlossen';
-
-          _missionIcon =
-              Icons.check_circle_rounded;
-
-          _showDeliveryCompleted = true;
-        });
+      onDeliveryCompleted: (int moneyReward, int xpReward) {
+        _handleDeliveryCompleted(moneyReward, xpReward);
       },
+    );
+  }
+
+  @override
+  void dispose() {
+    widget.progressController.removeListener(_onProgressChanged);
+
+    super.dispose();
+  }
+
+  void _onProgressChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
+  }
+
+  Future<void> _handleDeliveryCompleted(int moneyReward, int xpReward) async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _moneyReward = moneyReward;
+      _xpReward = xpReward;
+
+      _missionText = 'Lieferung abgeschlossen';
+
+      _missionIcon = Icons.check_circle_rounded;
+
+      _showDeliveryCompleted = true;
+    });
+
+    await widget.progressController.addRewards(
+      moneyReward: moneyReward,
+      xpReward: xpReward,
     );
   }
 
@@ -87,19 +100,18 @@ class _GamePageState extends State<GamePage> {
 
   @override
   Widget build(BuildContext context) {
+    final int money = widget.progressController.money;
+
+    final int xp = widget.progressController.xp;
+
     return Scaffold(
       body: Stack(
         children: [
-          Positioned.fill(
-            child: GameWidget(
-              game: _game,
-            ),
-          ),
+          Positioned.fill(child: GameWidget(game: _game)),
 
           // ------------------------------------------
           // ZURÜCK-BUTTON
           // ------------------------------------------
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -109,9 +121,7 @@ class _GamePageState extends State<GamePage> {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                  ),
+                  icon: const Icon(Icons.arrow_back_rounded),
                 ),
               ),
             ),
@@ -120,7 +130,6 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // GELD UND XP
           // ------------------------------------------
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -130,17 +139,11 @@ class _GamePageState extends State<GamePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _HudValue(
-                      icon:
-                          Icons.monetization_on_rounded,
-                      value: '$_money',
+                      icon: Icons.monetization_on_rounded,
+                      value: '$money',
                     ),
-                    const SizedBox(
-                      width: 8,
-                    ),
-                    _HudValue(
-                      icon: Icons.star_rounded,
-                      value: '$_xp XP',
-                    ),
+                    const SizedBox(width: 8),
+                    _HudValue(icon: Icons.star_rounded, value: '$xp XP'),
                   ],
                 ),
               ),
@@ -150,73 +153,47 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // MISSIONSZIEL
           // ------------------------------------------
-
           SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: const EdgeInsets.only(
-                  top: 12,
-                  left: 190,
-                  right: 190,
-                ),
+                padding: const EdgeInsets.only(top: 12, left: 190, right: 190),
                 child: Container(
-                  constraints:
-                      const BoxConstraints(
-                    maxWidth: 460,
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 11,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(
-                      alpha: 0.68,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white24,
-                    ),
+                    color: Colors.black.withValues(alpha: 0.68),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white24),
                     boxShadow: const [
                       BoxShadow(
                         color: Colors.black26,
                         blurRadius: 8,
-                        offset: Offset(
-                          0,
-                          3,
-                        ),
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
                   child: Row(
-                    mainAxisSize:
-                        MainAxisSize.min,
-                    mainAxisAlignment:
-                        MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         _missionIcon,
-                        color: const Color(
-                          0xFFFFD866,
-                        ),
+                        color: const Color(0xFFFFD866),
                         size: 22,
                       ),
-                      const SizedBox(
-                        width: 9,
-                      ),
+                      const SizedBox(width: 9),
                       Flexible(
                         child: Text(
                           _missionText,
-                          textAlign:
-                              TextAlign.center,
-                          style:
-                              const TextStyle(
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 15,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
@@ -230,106 +207,67 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // LIEFERUNG ABGESCHLOSSEN
           // ------------------------------------------
-
           if (_showDeliveryCompleted)
             SafeArea(
               child: Align(
-                alignment:
-                    Alignment.topCenter,
+                alignment: Alignment.topCenter,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.only(
-                    top: 78,
-                    left: 20,
-                    right: 20,
-                  ),
+                  padding: const EdgeInsets.only(top: 78, left: 20, right: 20),
                   child: Container(
-                    constraints:
-                        const BoxConstraints(
-                      maxWidth: 430,
-                    ),
-                    padding:
-                        const EdgeInsets.symmetric(
+                    constraints: const BoxConstraints(maxWidth: 430),
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 28,
                       vertical: 16,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(
-                        0xEE1D2A20,
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(
-                        18,
-                      ),
+                      color: const Color(0xEE1D2A20),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: const Color(
-                          0xFFF2C94C,
-                        ),
+                        color: const Color(0xFFF2C94C),
                         width: 2,
                       ),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black38,
                           blurRadius: 12,
-                          offset: Offset(
-                            0,
-                            4,
-                          ),
+                          offset: Offset(0, 4),
                         ),
                       ],
                     ),
                     child: Column(
-                      mainAxisSize:
-                          MainAxisSize.min,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Row(
-                          mainAxisSize:
-                              MainAxisSize.min,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons
-                                  .check_circle_rounded,
-                              color: Color(
-                                0xFF7DDB83,
-                              ),
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF7DDB83),
                               size: 25,
                             ),
-                            SizedBox(
-                              width: 9,
-                            ),
+                            SizedBox(width: 9),
                             Flexible(
                               child: Text(
                                 'LIEFERUNG ABGESCHLOSSEN!',
-                                textAlign:
-                                    TextAlign.center,
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color:
-                                      Colors.white,
+                                  color: Colors.white,
                                   fontSize: 20,
-                                  fontWeight:
-                                      FontWeight.bold,
-                                  letterSpacing:
-                                      0.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(
-                          height: 7,
-                        ),
+                        const SizedBox(height: 7),
                         Text(
                           '+$_moneyReward Geld   •   +$_xpReward XP',
-                          textAlign:
-                              TextAlign.center,
-                          style:
-                              const TextStyle(
-                            color: Color(
-                              0xFFFFD866,
-                            ),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFFFFD866),
                             fontSize: 17,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -340,15 +278,13 @@ class _GamePageState extends State<GamePage> {
             ),
 
           // ------------------------------------------
-          // RÜCKWÄRTS
+          // RÜCKWÄRTS / BREMSE
           // ------------------------------------------
-
           Positioned(
             left: 30,
             bottom: 25,
             child: _ControlButton(
-              icon: Icons
-                  .keyboard_double_arrow_left_rounded,
+              icon: Icons.keyboard_double_arrow_left_rounded,
               label: 'RÜCKWÄRTS',
               onPressed: _startReverse,
               onReleased: _releasePedal,
@@ -358,13 +294,11 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // GAS
           // ------------------------------------------
-
           Positioned(
             right: 30,
             bottom: 25,
             child: _ControlButton(
-              icon: Icons
-                  .keyboard_double_arrow_right_rounded,
+              icon: Icons.keyboard_double_arrow_right_rounded,
               label: 'GAS',
               onPressed: _startGas,
               onReleased: _releasePedal,
@@ -377,10 +311,7 @@ class _GamePageState extends State<GamePage> {
 }
 
 class _HudValue extends StatelessWidget {
-  const _HudValue({
-    required this.icon,
-    required this.value,
-  });
+  const _HudValue({required this.icon, required this.value});
 
   final IconData icon;
   final String value;
@@ -388,33 +319,17 @@ class _HudValue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 13,
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(
-          alpha: 0.68,
-        ),
-        borderRadius:
-            BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.white24,
-        ),
+        color: Colors.black.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white24),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 19,
-            color: const Color(
-              0xFFFFD866,
-            ),
-          ),
-          const SizedBox(
-            width: 6,
-          ),
+          Icon(icon, size: 19, color: const Color(0xFFFFD866)),
+          const SizedBox(width: 6),
           Text(
             value,
             style: const TextStyle(
@@ -459,28 +374,15 @@ class _ControlButton extends StatelessWidget {
         width: 120,
         height: 72,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(
-            alpha: 0.55,
-          ),
-          borderRadius:
-              BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white38,
-            width: 2,
-          ),
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white38, width: 2),
         ),
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 30,
-              color: Colors.white,
-            ),
-            const SizedBox(
-              height: 2,
-            ),
+            Icon(icon, size: 30, color: Colors.white),
+            const SizedBox(height: 2),
             Text(
               label,
               style: const TextStyle(

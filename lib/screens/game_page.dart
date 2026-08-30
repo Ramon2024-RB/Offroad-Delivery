@@ -28,7 +28,6 @@ class _GamePageState extends State<GamePage> {
   final Random _random = Random();
 
   String _missionText = 'Fahre zur Abholstation';
-
   IconData _missionIcon = Icons.inventory_2_rounded;
 
   bool _showPickupOverlay = false;
@@ -70,9 +69,7 @@ class _GamePageState extends State<GamePage> {
 
         setState(() {
           _showPickupOverlay = true;
-
           _missionText = 'Abholstation erreicht';
-
           _missionIcon = Icons.inventory_2_rounded;
         });
       },
@@ -129,9 +126,11 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   Future<void> _handleDeliveryCompleted(int moneyReward, int xpReward) async {
-    if (!mounted) {
+    if (!mounted || _showDeliveryCompleted) {
       return;
     }
+
+    _game.setThrottle(0);
 
     final int totalMoneyReward = moneyReward + _pickupBonusMoney;
     final int totalXpReward = xpReward + _pickupBonusXp;
@@ -141,7 +140,6 @@ class _GamePageState extends State<GamePage> {
       _xpReward = totalXpReward;
 
       _missionText = 'Lieferung abgeschlossen';
-
       _missionIcon = Icons.check_circle_rounded;
 
       _showDeliveryCompleted = true;
@@ -151,6 +149,18 @@ class _GamePageState extends State<GamePage> {
       moneyReward: totalMoneyReward,
       xpReward: totalXpReward,
     );
+  }
+
+  // ------------------------------------------
+  // NAVIGATION NACH MISSIONSENDE
+  // ------------------------------------------
+
+  void _goToMissionSelection() {
+    Navigator.of(context).pop();
+  }
+
+  void _goToMainMenu() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   // ------------------------------------------
@@ -261,7 +271,6 @@ class _GamePageState extends State<GamePage> {
 
     setState(() {
       _challengeSeconds = finalTime;
-
       _pickupChallengeSolved = true;
 
       _pickupStars = stars;
@@ -269,7 +278,6 @@ class _GamePageState extends State<GamePage> {
       _pickupBonusXp = bonusXp;
     });
 
-    // Ergebnis kurz anzeigen, bevor das Spiel weitergeht.
     await Future<void>.delayed(const Duration(milliseconds: 1100));
 
     if (!mounted) {
@@ -320,7 +328,7 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   void _startGas() {
-    if (_showPickupOverlay) {
+    if (_showPickupOverlay || _showDeliveryCompleted) {
       return;
     }
 
@@ -328,7 +336,7 @@ class _GamePageState extends State<GamePage> {
   }
 
   void _startReverse() {
-    if (_showPickupOverlay) {
+    if (_showPickupOverlay || _showDeliveryCompleted) {
       return;
     }
 
@@ -346,6 +354,7 @@ class _GamePageState extends State<GamePage> {
   @override
   Widget build(BuildContext context) {
     final int money = widget.progressController.money;
+
     final int xp = widget.progressController.xp;
 
     return Scaffold(
@@ -354,99 +363,99 @@ class _GamePageState extends State<GamePage> {
           Positioned.fill(child: GameWidget(game: _game)),
 
           // ------------------------------------------
-          // ZURÜCK-BUTTON
+          // ZURÜCK
           // ------------------------------------------
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: IconButton.filledTonal(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  icon: const Icon(Icons.arrow_back_rounded),
+          if (!_showDeliveryCompleted)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: IconButton.filledTonal(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
                 ),
               ),
             ),
-          ),
 
           // ------------------------------------------
           // GELD UND XP
           // ------------------------------------------
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _HudValue(
-                      icon: Icons.monetization_on_rounded,
-                      value: '$money',
-                    ),
-                    const SizedBox(width: 8),
-                    _HudValue(icon: Icons.star_rounded, value: '$xp XP'),
-                  ],
+          if (!_showDeliveryCompleted)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _HudValue(
+                        icon: Icons.monetization_on_rounded,
+                        value: '$money',
+                      ),
+                      const SizedBox(width: 8),
+                      _HudValue(icon: Icons.star_rounded, value: '$xp XP'),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
           // ------------------------------------------
           // MISSIONSZIEL
           // ------------------------------------------
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 12, left: 190, right: 190),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 11,
+          if (!_showDeliveryCompleted)
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    top: 12,
+                    left: 190,
+                    right: 190,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.68),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white24),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _missionIcon,
-                        color: const Color(0xFFFFD866),
-                        size: 22,
-                      ),
-                      const SizedBox(width: 9),
-                      Flexible(
-                        child: Text(
-                          _missionText,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 11,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.68),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _missionIcon,
+                          color: const Color(0xFFFFD866),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 9),
+                        Flexible(
+                          child: Text(
+                            _missionText,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
           // ------------------------------------------
           // ABHOLSTATION
@@ -470,13 +479,6 @@ class _GamePageState extends State<GamePage> {
                           color: const Color(0xFFF2B84B),
                           width: 2,
                         ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black54,
-                            blurRadius: 18,
-                            offset: Offset(0, 6),
-                          ),
-                        ],
                       ),
                       child: _pickupChallengeRunning
                           ? _buildPackageChallenge()
@@ -488,121 +490,287 @@ class _GamePageState extends State<GamePage> {
             ),
 
           // ------------------------------------------
-          // LIEFERUNG ABGESCHLOSSEN
+          // MISSIONSABSCHLUSS
           // ------------------------------------------
           if (_showDeliveryCompleted)
-            SafeArea(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 78, left: 20, right: 20),
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 430),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xEE1D2A20),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: const Color(0xFFF2C94C),
-                        width: 2,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black38,
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_circle_rounded,
-                              color: Color(0xFF7DDB83),
-                              size: 25,
-                            ),
-                            SizedBox(width: 9),
-                            Flexible(
-                              child: Text(
-                                'LIEFERUNG ABGESCHLOSSEN!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.68),
+                child: SafeArea(
+                  child: LayoutBuilder(
+                    builder:
+                        (BuildContext context, BoxConstraints constraints) {
+                          final double availableWidth = constraints.maxWidth;
+
+                          final double availableHeight = constraints.maxHeight;
+
+                          final double cardWidth = min(
+                            720,
+                            availableWidth - 32,
+                          ).toDouble();
+
+                          final double cardHeight = min(
+                            300,
+                            availableHeight - 28,
+                          ).toDouble();
+
+                          return Center(
+                            child: SizedBox(
+                              width: cardWidth,
+                              height: cardHeight,
+                              child: Container(
+                                padding: const EdgeInsets.all(18),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xF21D2A20),
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(
+                                    color: const Color(0xFFF2C94C),
+                                    width: 2,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black54,
+                                      blurRadius: 20,
+                                      offset: Offset(0, 7),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 6,
+                                      child: _buildCompletionSummary(),
+                                    ),
+
+                                    const SizedBox(width: 18),
+
+                                    Container(
+                                      width: 1,
+                                      height: double.infinity,
+                                      color: Colors.white12,
+                                    ),
+
+                                    const SizedBox(width: 18),
+
+                                    Expanded(
+                                      flex: 5,
+                                      child: _buildCompletionActions(),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          '+$_moneyReward Geld   •   +$_xpReward XP',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFFFFD866),
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (_pickupBonusMoney > 0 || _pickupBonusXp > 0) ...[
-                          const SizedBox(height: 5),
-                          Text(
-                            'inkl. Abholbonus: '
-                            '+$_pickupBonusMoney Geld / '
-                            '+$_pickupBonusXp XP',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                          );
+                        },
                   ),
                 ),
               ),
             ),
 
           // ------------------------------------------
-          // RÜCKWÄRTS / BREMSE
+          // STEUERUNG
           // ------------------------------------------
-          Positioned(
-            left: 30,
-            bottom: 25,
-            child: _ControlButton(
-              icon: Icons.keyboard_double_arrow_left_rounded,
-              label: 'RÜCKWÄRTS',
-              onPressed: _startReverse,
-              onReleased: _releasePedal,
+          if (!_showDeliveryCompleted)
+            Positioned(
+              left: 30,
+              bottom: 25,
+              child: _ControlButton(
+                icon: Icons.keyboard_double_arrow_left_rounded,
+                label: 'RÜCKWÄRTS',
+                onPressed: _startReverse,
+                onReleased: _releasePedal,
+              ),
+            ),
+
+          if (!_showDeliveryCompleted)
+            Positioned(
+              right: 30,
+              bottom: 25,
+              child: _ControlButton(
+                icon: Icons.keyboard_double_arrow_right_rounded,
+                label: 'GAS',
+                onPressed: _startGas,
+                onReleased: _releasePedal,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------
+  // ABSCHLUSS – LINKE SEITE
+  // ------------------------------------------
+
+  Widget _buildCompletionSummary() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          Icons.emoji_events_rounded,
+          color: Color(0xFFF2C94C),
+          size: 34,
+        ),
+
+        const SizedBox(height: 5),
+
+        const Text(
+          'LIEFERUNG ABGESCHLOSSEN!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.4,
+          ),
+        ),
+
+        const SizedBox(height: 4),
+
+        Text(
+          widget.mission.title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'GESAMTBELOHNUNG',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                '+$_moneyReward Geld  •  +$_xpReward XP',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFFFFD866),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+
+              if (_pickupBonusMoney > 0 || _pickupBonusXp > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Abholbonus: '
+                  '+$_pickupBonusMoney Geld / '
+                  '+$_pickupBonusXp XP',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF7DDB83),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ------------------------------------------
+  // ABSCHLUSS – RECHTE SEITE
+  // ------------------------------------------
+
+  Widget _buildCompletionActions() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (_pickupStars > 0) ...[
+          const Text(
+            'ABHOL-CHALLENGE',
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
             ),
           ),
 
-          // ------------------------------------------
-          // GAS
-          // ------------------------------------------
-          Positioned(
-            right: 30,
-            bottom: 25,
-            child: _ControlButton(
-              icon: Icons.keyboard_double_arrow_right_rounded,
-              label: 'GAS',
-              onPressed: _startGas,
-              onReleased: _releasePedal,
+          const SizedBox(height: 4),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List<Widget>.generate(3, (int index) {
+              final bool active = index < _pickupStars;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Icon(
+                  active ? Icons.star_rounded : Icons.star_border_rounded,
+                  color: active ? const Color(0xFFFFD866) : Colors.white30,
+                  size: 26,
+                ),
+              );
+            }),
+          ),
+
+          const SizedBox(height: 16),
+        ],
+
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _goToMissionSelection,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF2B84B),
+              foregroundColor: const Color(0xFF2C2517),
+              minimumSize: const Size(0, 46),
+            ),
+            icon: const Icon(Icons.assignment_rounded),
+            label: const Text(
+              'NÄCHSTER AUFTRAG',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.3),
             ),
           ),
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 10),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _goToMainMenu,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white38),
+              minimumSize: const Size(0, 46),
+            ),
+            icon: const Icon(Icons.home_rounded),
+            label: const Text(
+              'HAUPTMENÜ',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.3),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -622,7 +790,9 @@ class _GamePageState extends State<GamePage> {
           color: Color(0xFFF2B84B),
           size: 42,
         ),
+
         const SizedBox(height: 10),
+
         const Text(
           'ABHOLSTATION',
           textAlign: TextAlign.center,
@@ -633,12 +803,16 @@ class _GamePageState extends State<GamePage> {
             letterSpacing: 1,
           ),
         ),
+
         const SizedBox(height: 8),
+
         Text(
-          '${_cargoName(widget.mission.cargoType)} steht zur Abholung bereit.',
+          '${_cargoName(widget.mission.cargoType)} '
+          'steht zur Abholung bereit.',
           textAlign: TextAlign.center,
           style: const TextStyle(color: Colors.white70, fontSize: 15),
         ),
+
         const SizedBox(height: 20),
 
         if (packageChallengeAvailable) ...[
@@ -661,12 +835,15 @@ class _GamePageState extends State<GamePage> {
               ),
             ),
           ),
+
           const SizedBox(height: 10),
+
           const Text(
             'Finde die richtige Sendung möglichst schnell.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white60, fontSize: 12),
           ),
+
           const SizedBox(height: 16),
         ],
 
@@ -689,6 +866,7 @@ class _GamePageState extends State<GamePage> {
 
         if (!packageChallengeAvailable) ...[
           const SizedBox(height: 10),
+
           const Text(
             'Eine eigene Bonus-Challenge für diese Ladung folgt später.',
             textAlign: TextAlign.center,
@@ -712,7 +890,9 @@ class _GamePageState extends State<GamePage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         const Icon(Icons.search_rounded, color: Color(0xFFF2B84B), size: 36),
+
         const SizedBox(height: 6),
+
         const Text(
           'FINDE DIE RICHTIGE SENDUNG',
           textAlign: TextAlign.center,
@@ -723,7 +903,9 @@ class _GamePageState extends State<GamePage> {
             letterSpacing: 0.5,
           ),
         ),
+
         const SizedBox(height: 10),
+
         const Text(
           'GESUCHT',
           style: TextStyle(
@@ -733,7 +915,9 @@ class _GamePageState extends State<GamePage> {
             letterSpacing: 1.5,
           ),
         ),
+
         const SizedBox(height: 3),
+
         Text(
           'SENDUNG #$_targetPackageNumber',
           style: const TextStyle(
@@ -742,7 +926,9 @@ class _GamePageState extends State<GamePage> {
             fontWeight: FontWeight.w900,
           ),
         ),
+
         const SizedBox(height: 5),
+
         Text(
           '${_challengeSeconds.toStringAsFixed(1)} s',
           style: const TextStyle(
@@ -751,6 +937,7 @@ class _GamePageState extends State<GamePage> {
             fontWeight: FontWeight.bold,
           ),
         ),
+
         const SizedBox(height: 16),
 
         GridView.builder(
@@ -790,7 +977,9 @@ class _GamePageState extends State<GamePage> {
                         color: Color(0xFF5C4520),
                         size: 24,
                       ),
+
                       const SizedBox(height: 3),
+
                       Text(
                         '#$packageNumber',
                         style: const TextStyle(
@@ -808,6 +997,7 @@ class _GamePageState extends State<GamePage> {
         ),
 
         const SizedBox(height: 12),
+
         const Text(
           'Falsche Sendung? Kein Problem – die Zeit läuft nur weiter.',
           textAlign: TextAlign.center,
@@ -840,7 +1030,9 @@ class _GamePageState extends State<GamePage> {
           color: Color(0xFF7DDB83),
           size: 44,
         ),
+
         const SizedBox(height: 8),
+
         Text(
           rating,
           style: const TextStyle(
@@ -849,6 +1041,7 @@ class _GamePageState extends State<GamePage> {
             fontWeight: FontWeight.w900,
           ),
         ),
+
         const SizedBox(height: 6),
 
         Row(
@@ -868,15 +1061,18 @@ class _GamePageState extends State<GamePage> {
         ),
 
         const SizedBox(height: 8),
+
         Text(
           '${_challengeSeconds.toStringAsFixed(1)} Sekunden',
           style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
+
         const SizedBox(height: 8),
 
         if (_pickupBonusMoney > 0 || _pickupBonusXp > 0)
           Text(
-            '+$_pickupBonusMoney Geld   •   +$_pickupBonusXp XP',
+            '+$_pickupBonusMoney Geld   •   '
+            '+$_pickupBonusXp XP',
             style: const TextStyle(
               color: Color(0xFFFFD866),
               fontSize: 17,
@@ -895,7 +1091,7 @@ class _GamePageState extends State<GamePage> {
 }
 
 // ----------------------------------------------------
-// HUD-WERT
+// HUD
 // ----------------------------------------------------
 
 class _HudValue extends StatelessWidget {
@@ -917,7 +1113,9 @@ class _HudValue extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 19, color: const Color(0xFFFFD866)),
+
           const SizedBox(width: 6),
+
           Text(
             value,
             style: const TextStyle(
@@ -933,7 +1131,7 @@ class _HudValue extends StatelessWidget {
 }
 
 // ----------------------------------------------------
-// FAHRSTEUERUNG
+// STEUERUNG
 // ----------------------------------------------------
 
 class _ControlButton extends StatelessWidget {
@@ -974,7 +1172,9 @@ class _ControlButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 30, color: Colors.white),
+
             const SizedBox(height: 2),
+
             Text(
               label,
               style: const TextStyle(

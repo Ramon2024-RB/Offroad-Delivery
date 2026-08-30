@@ -26,6 +26,7 @@ class _GamePageState extends State<GamePage> {
 
   IconData _missionIcon = Icons.inventory_2_rounded;
 
+  bool _showPickupOverlay = false;
   bool _showDeliveryCompleted = false;
 
   int _moneyReward = 0;
@@ -39,18 +40,45 @@ class _GamePageState extends State<GamePage> {
 
     _game = PhysicsTestGame(
       mission: widget.mission,
+
+      // ------------------------------------------
+      // ABHOLSTATION ERREICHT
+      // ------------------------------------------
+      onPickupStationReached: () {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _showPickupOverlay = true;
+
+          _missionText = 'Abholstation erreicht';
+
+          _missionIcon = Icons.inventory_2_rounded;
+        });
+      },
+
+      // ------------------------------------------
+      // LADUNG WURDE EINGELADEN
+      // ------------------------------------------
       onCargoPickedUp: () {
         if (!mounted) {
           return;
         }
 
         setState(() {
+          _showPickupOverlay = false;
+
           _missionText =
               '${_cargoName(widget.mission.cargoType)} geladen – fahre zum ${_destinationName(widget.mission.destinationType)}';
 
           _missionIcon = Icons.local_shipping_rounded;
         });
       },
+
+      // ------------------------------------------
+      // LIEFERUNG ABGESCHLOSSEN
+      // ------------------------------------------
       onDeliveryCompleted: (int moneyReward, int xpReward) {
         _handleDeliveryCompleted(moneyReward, xpReward);
       },
@@ -94,6 +122,10 @@ class _GamePageState extends State<GamePage> {
     );
   }
 
+  void _quickLoadCargo() {
+    _game.completePickup();
+  }
+
   String _cargoName(CargoType cargoType) {
     switch (cargoType) {
       case CargoType.parcel:
@@ -127,10 +159,18 @@ class _GamePageState extends State<GamePage> {
   }
 
   void _startGas() {
+    if (_showPickupOverlay) {
+      return;
+    }
+
     _game.setThrottle(1);
   }
 
   void _startReverse() {
+    if (_showPickupOverlay) {
+      return;
+    }
+
     _game.setThrottle(-1);
   }
 
@@ -141,7 +181,6 @@ class _GamePageState extends State<GamePage> {
   @override
   Widget build(BuildContext context) {
     final int money = widget.progressController.money;
-
     final int xp = widget.progressController.xp;
 
     return Scaffold(
@@ -243,6 +282,101 @@ class _GamePageState extends State<GamePage> {
               ),
             ),
           ),
+
+          // ------------------------------------------
+          // ABHOLSTATION / CHALLENGE-GRUNDLAGE
+          // ------------------------------------------
+          if (_showPickupOverlay)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.48),
+                child: SafeArea(
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 470),
+                      margin: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: const Color(0xF21C2420),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: const Color(0xFFF2B84B),
+                          width: 2,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black54,
+                            blurRadius: 18,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.inventory_2_rounded,
+                            color: Color(0xFFF2B84B),
+                            size: 42,
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'ABHOLSTATION',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${_cargoName(widget.mission.cargoType)} steht zur Abholung bereit.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          const Text(
+                            'Die Bonus-Challenge kommt im nächsten Schritt.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: _quickLoadCargo,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFF2B84B),
+                                foregroundColor: const Color(0xFF2C2517),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                              ),
+                              icon: const Icon(Icons.local_shipping_rounded),
+                              label: const Text(
+                                'SCHNELL BELADEN',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // ------------------------------------------
           // LIEFERUNG ABGESCHLOSSEN

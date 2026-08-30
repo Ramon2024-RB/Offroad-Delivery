@@ -9,6 +9,7 @@ import 'components/physics_wheel.dart';
 class PhysicsTestGame extends Forge2DGame {
   PhysicsTestGame({
     required this.mission,
+    this.onPickupStationReached,
     this.onCargoPickedUp,
     this.onDeliveryCompleted,
   }) : super(
@@ -19,6 +20,7 @@ class PhysicsTestGame extends Forge2DGame {
 
   final DeliveryMission mission;
 
+  final VoidCallback? onPickupStationReached;
   final VoidCallback? onCargoPickedUp;
 
   final void Function(int moneyReward, int xpReward)? onDeliveryCompleted;
@@ -30,6 +32,7 @@ class PhysicsTestGame extends Forge2DGame {
   late final WheelJoint rearWheelJoint;
   late final WheelJoint frontWheelJoint;
 
+  bool _pickupStationReached = false;
   bool _cargoPickedUp = false;
   bool _deliveryCompleted = false;
 
@@ -39,9 +42,7 @@ class PhysicsTestGame extends Forge2DGame {
   static const double _motorTorque = 45;
 
   static const double _directionChangeSpeed = 0.75;
-
   static const double _brakeStrength = 8.0;
-
   static const double _coastBrakeStrength = 1.2;
 
   static const double _rearWheelX = -1.45;
@@ -55,13 +56,9 @@ class PhysicsTestGame extends Forge2DGame {
   // ------------------------------------------
 
   static const double _deliveryDestinationX = 140.0;
-
   static const double _deliveryGroundY = 8.0;
-
   static const double _deliveryZoneCenterX = _deliveryDestinationX - 4.0;
-
   static const double _deliveryZoneHalfWidth = 2.0;
-
   static const double _deliveryMaxSpeed = 1.0;
 
   @override
@@ -74,7 +71,6 @@ class PhysicsTestGame extends Forge2DGame {
     await super.onLoad();
 
     final PhysicsLandscape landscape = PhysicsLandscape();
-
     final PhysicsTerrain terrain = PhysicsTerrain();
 
     final PickupStation pickupStation = PickupStation(
@@ -133,7 +129,6 @@ class PhysicsTestGame extends Forge2DGame {
     }
 
     final double vehicleX = vehicle.body.position.x;
-
     final double vehicleY = vehicle.body.position.y;
 
     camera.viewfinder.position = Vector2(vehicleX + 5, vehicleY + 0.5);
@@ -225,19 +220,67 @@ class PhysicsTestGame extends Forge2DGame {
     vehicle.body.linearVelocity = Vector2(newHorizontalSpeed, velocity.y);
   }
 
+  // ------------------------------------------
+  // ABHOLSTATION
+  // ------------------------------------------
+
   void _checkPickup(double vehicleX) {
-    if (_cargoPickedUp) {
+    if (_pickupStationReached || _cargoPickedUp) {
       return;
     }
 
-    if (vehicleX >= _pickupX - 1.5 && vehicleX <= _pickupX + 1.5) {
-      _cargoPickedUp = true;
+    final bool insidePickupZone =
+        vehicleX >= _pickupX - 1.5 && vehicleX <= _pickupX + 1.5;
 
-      vehicle.showCargo();
-
-      onCargoPickedUp?.call();
+    if (!insidePickupZone) {
+      return;
     }
+
+    _pickupStationReached = true;
+
+    // Pedal und Motor sofort neutralisieren.
+    _throttle = 0;
+    rearWheelJoint.motorSpeed = 0;
+
+    // Flutter darüber informieren, damit das
+    // Abholfenster angezeigt wird.
+    onPickupStationReached?.call();
+
+    // Während des Abholvorgangs wird die komplette
+    // Flame-/Forge2D-Spielwelt pausiert.
+    pauseEngine();
   }
+
+  void completePickup() {
+    if (!_pickupStationReached || _cargoPickedUp) {
+      return;
+    }
+
+    // Ladung wurde übernommen.
+    _cargoPickedUp = true;
+
+    // Der Abholvorgang ist beendet.
+    _pickupStationReached = false;
+
+    // Nach dem Overlay starten wir mit neutralem
+    // Pedalzustand.
+    _throttle = 0;
+    rearWheelJoint.motorSpeed = 0;
+
+    // Ladung auf dem Pickup anzeigen.
+    vehicle.showCargo();
+
+    // Flutter darüber informieren, damit das
+    // Abholfenster geschlossen wird.
+    onCargoPickedUp?.call();
+
+    // Flame und Forge2D wieder starten.
+    resumeEngine();
+  }
+
+  // ------------------------------------------
+  // LIEFERUNG
+  // ------------------------------------------
 
   void _checkDelivery(double vehicleX) {
     if (!_cargoPickedUp) {
@@ -272,6 +315,10 @@ class PhysicsTestGame extends Forge2DGame {
 
     onDeliveryCompleted?.call(mission.moneyReward, mission.xpReward);
   }
+
+  // ------------------------------------------
+  // FEDERUNG
+  // ------------------------------------------
 
   void _createSuspension() {
     final WheelJointDef rearJointDef = WheelJointDef(
@@ -311,7 +358,19 @@ class PhysicsTestGame extends Forge2DGame {
     frontWheelJoint = world.physicsWorld.createWheelJoint(frontJointDef);
   }
 
+  // ------------------------------------------
+  // STEUERUNG
+  // ------------------------------------------
+
   void setThrottle(double value) {
+    // Während der Abholung darf keine Eingabe
+    // gespeichert werden.
+    if (_pickupStationReached && !_cargoPickedUp) {
+      _throttle = 0;
+
+      return;
+    }
+
     _throttle = value.clamp(-1.0, 1.0);
   }
 }
@@ -604,7 +663,6 @@ class DeliveryConstructionSite extends DeliveryDestination {
 
     canvas.drawRect(const Rect.fromLTWH(2.4, -2.0, 0.9, 0.9), _darkPaint);
 
-    // Gerüst
     for (double x = -0.45; x <= 4.25; x += 1.55) {
       canvas.drawRect(Rect.fromLTWH(x, -3.45, 0.09, 3.3), _woodPaint);
     }
@@ -613,7 +671,6 @@ class DeliveryConstructionSite extends DeliveryDestination {
       canvas.drawRect(Rect.fromLTWH(-0.5, y, 4.85, 0.09), _woodPaint);
     }
 
-    // Warnschild
     canvas.drawRect(
       const Rect.fromLTWH(-1.25, -1.45, 0.95, 0.65),
       _warningPaint,

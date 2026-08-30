@@ -10,36 +10,48 @@ class MissionSelectionPage extends StatelessWidget {
 
   final PlayerProgressController progressController;
 
+  // NUR FÜR DIE ENTWICKLUNG:
+  // true = alle Missionen können getestet werden.
+  // false = normale Level-Sperren gelten wieder.
+  static const bool _developmentUnlockAllMissions = true;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF10170D),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                itemCount: MissionCatalog.missions.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final DeliveryMission mission =
-                      MissionCatalog.missions[index];
+    return AnimatedBuilder(
+      animation: progressController,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF10170D),
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(context),
+                if (_developmentUnlockAllMissions) _buildDevelopmentNotice(),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                    itemCount: MissionCatalog.missions.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final DeliveryMission mission =
+                          MissionCatalog.missions[index];
 
-                  return _MissionCard(
-                    mission: mission,
-                    playerLevel: progressController.level,
-                    onStart: () {
-                      _startMission(context, mission);
+                      return _MissionCard(
+                        mission: mission,
+                        playerLevel: progressController.level,
+                        developmentUnlocked: _developmentUnlockAllMissions,
+                        onStart: () {
+                          _startMission(context, mission);
+                        },
+                      );
                     },
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -93,8 +105,40 @@ class MissionSelectionPage extends StatelessWidget {
     );
   }
 
+  Widget _buildDevelopmentNotice() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 2, 24, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2B2513),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x55FFD866)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.science_rounded, size: 18, color: Color(0xFFFFD866)),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'ENTWICKLUNGSMODUS – alle Aufträge sind zum Testen verfügbar',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFFD866),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _startMission(BuildContext context, DeliveryMission mission) {
-    if (!mission.isUnlockedForLevel(progressController.level)) {
+    final bool normallyUnlocked = mission.isUnlockedForLevel(
+      progressController.level,
+    );
+
+    if (!normallyUnlocked && !_developmentUnlockAllMissions) {
       return;
     }
 
@@ -111,23 +155,35 @@ class _MissionCard extends StatelessWidget {
   const _MissionCard({
     required this.mission,
     required this.playerLevel,
+    required this.developmentUnlocked,
     required this.onStart,
   });
 
   final DeliveryMission mission;
   final int playerLevel;
+  final bool developmentUnlocked;
   final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
-    final bool unlocked = mission.isUnlockedForLevel(playerLevel);
+    final bool normallyUnlocked = mission.isUnlockedForLevel(playerLevel);
+
+    final bool playable = normallyUnlocked || developmentUnlocked;
+
+    final bool developmentOnly = !normallyUnlocked && developmentUnlocked;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: unlocked ? const Color(0xFF1A2616) : const Color(0xFF171917),
+        color: playable ? const Color(0xFF1A2616) : const Color(0xFF171917),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: unlocked ? Colors.white12 : Colors.white10),
+        border: Border.all(
+          color: developmentOnly
+              ? const Color(0x55FFD866)
+              : playable
+              ? Colors.white12
+              : Colors.white10,
+        ),
       ),
       child: Row(
         children: [
@@ -135,13 +191,13 @@ class _MissionCard extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: unlocked ? const Color(0xFF2B3D22) : Colors.white10,
+              color: playable ? const Color(0xFF2B3D22) : Colors.white10,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
-              unlocked ? _cargoIcon(mission.cargoType) : Icons.lock_rounded,
+              playable ? _cargoIcon(mission.cargoType) : Icons.lock_rounded,
               size: 29,
-              color: unlocked ? const Color(0xFFFFD866) : Colors.white38,
+              color: playable ? const Color(0xFFFFD866) : Colors.white38,
             ),
           ),
           const SizedBox(width: 16),
@@ -157,10 +213,15 @@ class _MissionCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: unlocked ? Colors.white : Colors.white54,
+                          color: playable ? Colors.white : Colors.white54,
                         ),
                       ),
                     ),
+                    if (developmentOnly) ...[
+                      const SizedBox(width: 8),
+                      const _DevelopmentBadge(),
+                    ],
+                    const SizedBox(width: 8),
                     _DifficultyBadge(difficulty: mission.difficulty),
                   ],
                 ),
@@ -172,7 +233,7 @@ class _MissionCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.3,
-                    color: unlocked ? Colors.white60 : Colors.white30,
+                    color: playable ? Colors.white60 : Colors.white30,
                   ),
                 ),
                 const SizedBox(height: 9),
@@ -211,9 +272,9 @@ class _MissionCard extends StatelessWidget {
             width: 125,
             height: 44,
             child: FilledButton(
-              onPressed: unlocked ? onStart : null,
+              onPressed: playable ? onStart : null,
               child: Text(
-                unlocked ? 'ANNEHMEN' : 'LEVEL ${mission.requiredLevel}',
+                playable ? 'ANNEHMEN' : 'LEVEL ${mission.requiredLevel}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
@@ -273,6 +334,30 @@ class _MissionCard extends StatelessWidget {
       case DestinationType.workshop:
         return 'Werkstatt';
     }
+  }
+}
+
+class _DevelopmentBadge extends StatelessWidget {
+  const _DevelopmentBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0x22FFD866),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0x55FFD866)),
+      ),
+      child: const Text(
+        'TEST',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          color: Color(0xFFFFD866),
+        ),
+      ),
+    );
   }
 }
 

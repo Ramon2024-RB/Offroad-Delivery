@@ -3,7 +3,6 @@ import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
 
 import '../missions/delivery_mission.dart';
-
 import 'components/physics_vehicle.dart';
 import 'components/physics_wheel.dart';
 
@@ -39,16 +38,10 @@ class PhysicsTestGame extends Forge2DGame {
   static const double _motorSpeed = 18;
   static const double _motorTorque = 45;
 
-  // Geschwindigkeit, unterhalb der wir die
-  // Fahrtrichtung wechseln dürfen.
   static const double _directionChangeSpeed = 0.75;
 
-  // Stärke der Bremse beim Drücken der
-  // entgegengesetzten Fahrtrichtung.
   static const double _brakeStrength = 8.0;
 
-  // Leichte Motorbremse, wenn kein Pedal
-  // gedrückt wird.
   static const double _coastBrakeStrength = 1.2;
 
   static const double _rearWheelX = -1.45;
@@ -57,9 +50,15 @@ class PhysicsTestGame extends Forge2DGame {
 
   static const double _pickupX = 18.0;
 
-  static const double _deliveryHouseX = 125.0;
+  // ------------------------------------------
+  // ZIELBEREICH
+  // ------------------------------------------
 
-  static const double _deliveryZoneCenterX = _deliveryHouseX - 3.0;
+  static const double _deliveryDestinationX = 140.0;
+
+  static const double _deliveryGroundY = 8.0;
+
+  static const double _deliveryZoneCenterX = _deliveryDestinationX - 4.0;
 
   static const double _deliveryZoneHalfWidth = 2.0;
 
@@ -82,9 +81,7 @@ class PhysicsTestGame extends Forge2DGame {
       position: Vector2(_pickupX, 7.0),
     );
 
-    final DeliveryHouse deliveryHouse = DeliveryHouse(
-      position: Vector2(_deliveryHouseX, 6.6),
-    );
+    final PositionComponent deliveryDestination = _createDeliveryDestination();
 
     vehicle = PhysicsVehicle(startPosition: Vector2(8, 5));
 
@@ -99,7 +96,7 @@ class PhysicsTestGame extends Forge2DGame {
     await world.add(landscape);
     await world.add(terrain);
     await world.add(pickupStation);
-    await world.add(deliveryHouse);
+    await world.add(deliveryDestination);
     await world.add(vehicle);
     await world.add(rearWheel);
     await world.add(frontWheel);
@@ -107,6 +104,24 @@ class PhysicsTestGame extends Forge2DGame {
     _createSuspension();
 
     camera.viewfinder.position = Vector2(12, 6);
+  }
+
+  PositionComponent _createDeliveryDestination() {
+    final Vector2 position = Vector2(_deliveryDestinationX, _deliveryGroundY);
+
+    switch (mission.destinationType) {
+      case DestinationType.house:
+        return DeliveryHouse(position: position);
+
+      case DestinationType.mountainHut:
+        return DeliveryMountainHut(position: position);
+
+      case DestinationType.constructionSite:
+        return DeliveryConstructionSite(position: position);
+
+      case DestinationType.workshop:
+        return DeliveryWorkshop(position: position);
+    }
   }
 
   @override
@@ -134,8 +149,7 @@ class PhysicsTestGame extends Forge2DGame {
     final double horizontalSpeed = vehicle.body.linearVelocity.x;
 
     // ------------------------------------------
-    // KEIN PEDAL:
-    // leichte Motorbremse
+    // KEIN PEDAL
     // ------------------------------------------
 
     if (_throttle == 0) {
@@ -151,8 +165,6 @@ class PhysicsTestGame extends Forge2DGame {
     // ------------------------------------------
 
     if (_throttle > 0) {
-      // Wir rollen noch deutlich rückwärts:
-      // erst abbremsen.
       if (horizontalSpeed < -_directionChangeSpeed) {
         rearWheelJoint.motorSpeed = 0;
 
@@ -161,8 +173,6 @@ class PhysicsTestGame extends Forge2DGame {
         return;
       }
 
-      // Fast Stillstand oder bereits vorwärts:
-      // normal Gas geben.
       rearWheelJoint.motorSpeed = _motorSpeed;
 
       return;
@@ -173,8 +183,6 @@ class PhysicsTestGame extends Forge2DGame {
     // ------------------------------------------
 
     if (_throttle < 0) {
-      // Wir fahren noch deutlich vorwärts:
-      // zuerst kräftig abbremsen.
       if (horizontalSpeed > _directionChangeSpeed) {
         rearWheelJoint.motorSpeed = 0;
 
@@ -183,8 +191,6 @@ class PhysicsTestGame extends Forge2DGame {
         return;
       }
 
-      // Fast Stillstand oder bereits rückwärts:
-      // Rückwärtsgang.
       rearWheelJoint.motorSpeed = -_motorSpeed;
     }
   }
@@ -250,10 +256,6 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    // Für die Lieferung interessiert uns vor allem,
-    // ob der Pickup horizontal fast steht.
-    // Federbewegungen nach oben/unten sollen die
-    // Ablieferung nicht verhindern.
     final double speed = vehicle.body.linearVelocity.x.abs();
 
     if (speed > _deliveryMaxSpeed) {
@@ -362,11 +364,51 @@ class PickupStation extends PositionComponent {
 }
 
 // ----------------------------------------------------
-// LIEFERHAUS
+// GEMEINSAME ABGABESTATION
 // ----------------------------------------------------
 
-class DeliveryHouse extends PositionComponent {
-  DeliveryHouse({required super.position}) : super(priority: 4);
+abstract class DeliveryDestination extends PositionComponent {
+  DeliveryDestination({required super.position, super.priority = 4});
+
+  final Paint deliveryZonePaint = Paint()..color = const Color(0x66F4D35E);
+
+  final Paint deliveryZoneBorderPaint = Paint()
+    ..color = const Color(0xFFD9B83E)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.09;
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+
+    drawDeliveryZone(canvas);
+
+    drawDestination(canvas);
+  }
+
+  void drawDeliveryZone(Canvas canvas) {
+    const Rect zone = Rect.fromLTWH(-5.6, -0.18, 4.0, 0.30);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(zone, const Radius.circular(0.12)),
+      deliveryZonePaint,
+    );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(zone, const Radius.circular(0.12)),
+      deliveryZoneBorderPaint,
+    );
+  }
+
+  void drawDestination(Canvas canvas);
+}
+
+// ----------------------------------------------------
+// WOHNHAUS
+// ----------------------------------------------------
+
+class DeliveryHouse extends DeliveryDestination {
+  DeliveryHouse({required super.position});
 
   final Paint _wallPaint = Paint()..color = const Color(0xFFD7C5A2);
 
@@ -389,36 +431,8 @@ class DeliveryHouse extends PositionComponent {
 
   final Paint _stonePaint = Paint()..color = const Color(0xFF7A756B);
 
-  final Paint _deliveryZonePaint = Paint()..color = const Color(0x66F4D35E);
-
-  final Paint _deliveryZoneBorderPaint = Paint()
-    ..color = const Color(0xFFD9B83E)
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 0.09;
-
   @override
-  void render(Canvas canvas) {
-    super.render(canvas);
-
-    _drawDeliveryZone(canvas);
-    _drawHouse(canvas);
-  }
-
-  void _drawDeliveryZone(Canvas canvas) {
-    const Rect zone = Rect.fromLTWH(-4.6, 0.05, 3.2, 0.45);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(zone, const Radius.circular(0.15)),
-      _deliveryZonePaint,
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(zone, const Radius.circular(0.15)),
-      _deliveryZoneBorderPaint,
-    );
-  }
-
-  void _drawHouse(Canvas canvas) {
+  void drawDestination(Canvas canvas) {
     canvas.drawRect(const Rect.fromLTWH(-1.35, -0.20, 4.9, 0.28), _stonePaint);
 
     canvas.drawRRect(
@@ -502,6 +516,167 @@ class DeliveryHouse extends PositionComponent {
       Offset(x, y + 0.41),
       Offset(x + 0.78, y + 0.41),
       _windowFramePaint,
+    );
+  }
+}
+
+// ----------------------------------------------------
+// BERGHÜTTE
+// ----------------------------------------------------
+
+class DeliveryMountainHut extends DeliveryDestination {
+  DeliveryMountainHut({required super.position});
+
+  final Paint _woodPaint = Paint()..color = const Color(0xFF8A603E);
+
+  final Paint _darkWoodPaint = Paint()..color = const Color(0xFF5D3D29);
+
+  final Paint _roofPaint = Paint()..color = const Color(0xFF3F4542);
+
+  final Paint _windowPaint = Paint()..color = const Color(0xFF9ED2DF);
+
+  final Paint _stonePaint = Paint()..color = const Color(0xFF77756E);
+
+  @override
+  void drawDestination(Canvas canvas) {
+    canvas.drawRect(const Rect.fromLTWH(-1.0, -0.18, 4.7, 0.22), _stonePaint);
+
+    canvas.drawRect(const Rect.fromLTWH(-0.8, -2.7, 4.3, 2.55), _woodPaint);
+
+    for (double y = -2.45; y < -0.3; y += 0.42) {
+      canvas.drawLine(
+        Offset(-0.8, y),
+        Offset(3.5, y),
+        Paint()
+          ..color = const Color(0xFF704B32)
+          ..strokeWidth = 0.06,
+      );
+    }
+
+    final Path roof = Path()
+      ..moveTo(-1.25, -2.65)
+      ..lineTo(1.25, -4.45)
+      ..lineTo(3.95, -2.65)
+      ..close();
+
+    canvas.drawPath(roof, _roofPaint);
+
+    canvas.drawRect(const Rect.fromLTWH(0.9, -1.85, 0.9, 1.7), _darkWoodPaint);
+
+    canvas.drawRect(const Rect.fromLTWH(-0.25, -2.0, 0.8, 0.75), _windowPaint);
+
+    canvas.drawRect(const Rect.fromLTWH(2.25, -2.0, 0.8, 0.75), _windowPaint);
+
+    canvas.drawRect(const Rect.fromLTWH(2.8, -4.15, 0.4, 1.1), _darkWoodPaint);
+  }
+}
+
+// ----------------------------------------------------
+// BAUSTELLE
+// ----------------------------------------------------
+
+class DeliveryConstructionSite extends DeliveryDestination {
+  DeliveryConstructionSite({required super.position});
+
+  final Paint _concretePaint = Paint()..color = const Color(0xFFB5B5AE);
+
+  final Paint _darkConcretePaint = Paint()..color = const Color(0xFF858680);
+
+  final Paint _woodPaint = Paint()..color = const Color(0xFF9A7044);
+
+  final Paint _warningPaint = Paint()..color = const Color(0xFFF2B84B);
+
+  final Paint _darkPaint = Paint()..color = const Color(0xFF353A3C);
+
+  @override
+  void drawDestination(Canvas canvas) {
+    canvas.drawRect(
+      const Rect.fromLTWH(-0.8, -0.18, 5.5, 0.22),
+      _darkConcretePaint,
+    );
+
+    canvas.drawRect(const Rect.fromLTWH(0.0, -2.7, 3.8, 2.55), _concretePaint);
+
+    canvas.drawRect(
+      const Rect.fromLTWH(0.7, -2.0, 1.0, 1.85),
+      _darkConcretePaint,
+    );
+
+    canvas.drawRect(const Rect.fromLTWH(2.4, -2.0, 0.9, 0.9), _darkPaint);
+
+    // Gerüst
+    for (double x = -0.45; x <= 4.25; x += 1.55) {
+      canvas.drawRect(Rect.fromLTWH(x, -3.45, 0.09, 3.3), _woodPaint);
+    }
+
+    for (double y = -3.35; y <= -0.3; y += 1.0) {
+      canvas.drawRect(Rect.fromLTWH(-0.5, y, 4.85, 0.09), _woodPaint);
+    }
+
+    // Warnschild
+    canvas.drawRect(
+      const Rect.fromLTWH(-1.25, -1.45, 0.95, 0.65),
+      _warningPaint,
+    );
+
+    canvas.drawLine(
+      const Offset(-0.78, -0.8),
+      const Offset(-0.78, -0.1),
+      Paint()
+        ..color = const Color(0xFF4A4F52)
+        ..strokeWidth = 0.1,
+    );
+  }
+}
+
+// ----------------------------------------------------
+// WERKSTATT
+// ----------------------------------------------------
+
+class DeliveryWorkshop extends DeliveryDestination {
+  DeliveryWorkshop({required super.position});
+
+  final Paint _wallPaint = Paint()..color = const Color(0xFF8A9395);
+
+  final Paint _darkWallPaint = Paint()..color = const Color(0xFF60686A);
+
+  final Paint _roofPaint = Paint()..color = const Color(0xFF404648);
+
+  final Paint _garageDoorPaint = Paint()..color = const Color(0xFFCDD2D2);
+
+  final Paint _doorLinePaint = Paint()
+    ..color = const Color(0xFF8E9697)
+    ..strokeWidth = 0.06;
+
+  final Paint _signPaint = Paint()..color = const Color(0xFFF2B84B);
+
+  @override
+  void drawDestination(Canvas canvas) {
+    canvas.drawRect(
+      const Rect.fromLTWH(-1.0, -0.18, 5.6, 0.22),
+      _darkWallPaint,
+    );
+
+    canvas.drawRect(const Rect.fromLTWH(-0.7, -3.1, 5.1, 2.95), _wallPaint);
+
+    canvas.drawRect(const Rect.fromLTWH(-0.95, -3.35, 5.6, 0.35), _roofPaint);
+
+    const Rect garageDoor = Rect.fromLTWH(-0.1, -2.35, 2.65, 2.2);
+
+    canvas.drawRect(garageDoor, _garageDoorPaint);
+
+    for (double y = -2.1; y < -0.2; y += 0.4) {
+      canvas.drawLine(Offset(-0.1, y), Offset(2.55, y), _doorLinePaint);
+    }
+
+    canvas.drawRect(const Rect.fromLTWH(3.0, -2.0, 0.75, 1.85), _darkWallPaint);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(0.45, -3.9, 2.2, 0.55),
+        const Radius.circular(0.08),
+      ),
+      _signPaint,
     );
   }
 }
@@ -674,10 +849,19 @@ class PhysicsTerrain extends BodyComponent {
     Vector2(104, 5.2),
     Vector2(110, 4.7),
     Vector2(116, 5.3),
+
+    // Übergang zum Zielbereich
     Vector2(122, 6.5),
-    Vector2(128, 7.6),
+    Vector2(128, 7.5),
+    Vector2(132, 8.0),
+
+    // ------------------------------------------
+    // EBENE ABGABESTATION
+    // ------------------------------------------
     Vector2(136, 8.0),
-    Vector2(145, 8.0),
+    Vector2(140, 8.0),
+    Vector2(144, 8.0),
+    Vector2(148, 8.0),
     Vector2(155, 8.0),
   ];
 

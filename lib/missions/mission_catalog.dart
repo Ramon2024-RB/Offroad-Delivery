@@ -15,6 +15,14 @@ class MissionCatalog {
       moneyReward: 250,
       xpReward: 100,
       requiredLevel: 1,
+      ratingRules: [
+        MissionRatingRule(
+          category: MissionRatingCategory.deliveryTime,
+          maxStars: 3,
+          threeStarTimeSeconds: 60,
+          twoStarTimeSeconds: 90,
+        ),
+      ],
     ),
     DeliveryMission(
       id: 'food_mountain_hut_01',
@@ -26,6 +34,14 @@ class MissionCatalog {
       moneyReward: 400,
       xpReward: 175,
       requiredLevel: 2,
+      ratingRules: [
+        MissionRatingRule(
+          category: MissionRatingCategory.deliveryTime,
+          maxStars: 3,
+          threeStarTimeSeconds: 60,
+          twoStarTimeSeconds: 90,
+        ),
+      ],
     ),
     DeliveryMission(
       id: 'building_materials_01',
@@ -37,6 +53,14 @@ class MissionCatalog {
       moneyReward: 550,
       xpReward: 225,
       requiredLevel: 3,
+      ratingRules: [
+        MissionRatingRule(
+          category: MissionRatingCategory.deliveryTime,
+          maxStars: 3,
+          threeStarTimeSeconds: 60,
+          twoStarTimeSeconds: 90,
+        ),
+      ],
     ),
     DeliveryMission(
       id: 'vehicle_parts_workshop_01',
@@ -48,12 +72,22 @@ class MissionCatalog {
       moneyReward: 800,
       xpReward: 350,
       requiredLevel: 5,
+      ratingRules: [
+        MissionRatingRule(
+          category: MissionRatingCategory.deliveryTime,
+          maxStars: 3,
+          threeStarTimeSeconds: 60,
+          twoStarTimeSeconds: 90,
+        ),
+      ],
     ),
   ];
 
   static List<DeliveryMission> unlockedMissions(int playerLevel) {
     return missions
-        .where((mission) => mission.isUnlockedForLevel(playerLevel))
+        .where(
+          (DeliveryMission mission) => mission.isUnlockedForLevel(playerLevel),
+        )
         .toList();
   }
 

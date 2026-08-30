@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
@@ -22,12 +25,28 @@ class GamePage extends StatefulWidget {
 class _GamePageState extends State<GamePage> {
   late final PhysicsTestGame _game;
 
+  final Random _random = Random();
+
   String _missionText = 'Fahre zur Abholstation';
 
   IconData _missionIcon = Icons.inventory_2_rounded;
 
   bool _showPickupOverlay = false;
   bool _showDeliveryCompleted = false;
+
+  bool _pickupChallengeRunning = false;
+  bool _pickupChallengeSolved = false;
+
+  List<int> _packageNumbers = <int>[];
+  int _targetPackageNumber = 0;
+
+  Timer? _challengeTimer;
+  DateTime? _challengeStartedAt;
+  double _challengeSeconds = 0;
+
+  int _pickupBonusMoney = 0;
+  int _pickupBonusXp = 0;
+  int _pickupStars = 0;
 
   int _moneyReward = 0;
   int _xpReward = 0;
@@ -68,9 +87,12 @@ class _GamePageState extends State<GamePage> {
 
         setState(() {
           _showPickupOverlay = false;
+          _pickupChallengeRunning = false;
+          _pickupChallengeSolved = false;
 
           _missionText =
-              '${_cargoName(widget.mission.cargoType)} geladen – fahre zum ${_destinationName(widget.mission.destinationType)}';
+              '${_cargoName(widget.mission.cargoType)} geladen – '
+              'fahre zum ${_destinationName(widget.mission.destinationType)}';
 
           _missionIcon = Icons.local_shipping_rounded;
         });
@@ -87,6 +109,8 @@ class _GamePageState extends State<GamePage> {
 
   @override
   void dispose() {
+    _challengeTimer?.cancel();
+
     widget.progressController.removeListener(_onProgressChanged);
 
     super.dispose();
@@ -100,14 +124,21 @@ class _GamePageState extends State<GamePage> {
     setState(() {});
   }
 
+  // ------------------------------------------
+  // LIEFERUNG ABSCHLIESSEN
+  // ------------------------------------------
+
   Future<void> _handleDeliveryCompleted(int moneyReward, int xpReward) async {
     if (!mounted) {
       return;
     }
 
+    final int totalMoneyReward = moneyReward + _pickupBonusMoney;
+    final int totalXpReward = xpReward + _pickupBonusXp;
+
     setState(() {
-      _moneyReward = moneyReward;
-      _xpReward = xpReward;
+      _moneyReward = totalMoneyReward;
+      _xpReward = totalXpReward;
 
       _missionText = 'Lieferung abgeschlossen';
 
@@ -117,14 +148,140 @@ class _GamePageState extends State<GamePage> {
     });
 
     await widget.progressController.addRewards(
-      moneyReward: moneyReward,
-      xpReward: xpReward,
+      moneyReward: totalMoneyReward,
+      xpReward: totalXpReward,
     );
   }
 
+  // ------------------------------------------
+  // SCHNELL BELADEN
+  // ------------------------------------------
+
   void _quickLoadCargo() {
+    _challengeTimer?.cancel();
+
+    _pickupBonusMoney = 0;
+    _pickupBonusXp = 0;
+    _pickupStars = 0;
+
     _game.completePickup();
   }
+
+  // ------------------------------------------
+  // PAKET-CHALLENGE STARTEN
+  // ------------------------------------------
+
+  void _startPackageChallenge() {
+    if (_pickupChallengeRunning) {
+      return;
+    }
+
+    final Set<int> generatedNumbers = <int>{};
+
+    while (generatedNumbers.length < 6) {
+      generatedNumbers.add(100 + _random.nextInt(900));
+    }
+
+    final List<int> numbers = generatedNumbers.toList()..shuffle(_random);
+
+    final int target = numbers[_random.nextInt(numbers.length)];
+
+    _challengeTimer?.cancel();
+
+    setState(() {
+      _packageNumbers = numbers;
+      _targetPackageNumber = target;
+
+      _pickupChallengeRunning = true;
+      _pickupChallengeSolved = false;
+
+      _challengeSeconds = 0;
+
+      _pickupBonusMoney = 0;
+      _pickupBonusXp = 0;
+      _pickupStars = 0;
+    });
+
+    _challengeStartedAt = DateTime.now();
+
+    _challengeTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted || _challengeStartedAt == null) {
+        return;
+      }
+
+      final double seconds =
+          DateTime.now().difference(_challengeStartedAt!).inMilliseconds / 1000;
+
+      setState(() {
+        _challengeSeconds = seconds;
+      });
+    });
+  }
+
+  // ------------------------------------------
+  // PAKET AUSWÄHLEN
+  // ------------------------------------------
+
+  Future<void> _selectPackage(int packageNumber) async {
+    if (!_pickupChallengeRunning || _pickupChallengeSolved) {
+      return;
+    }
+
+    if (packageNumber != _targetPackageNumber) {
+      return;
+    }
+
+    _challengeTimer?.cancel();
+
+    final double finalTime = _challengeStartedAt == null
+        ? _challengeSeconds
+        : DateTime.now().difference(_challengeStartedAt!).inMilliseconds / 1000;
+
+    int stars;
+    int bonusMoney;
+    int bonusXp;
+
+    if (finalTime <= 5.0) {
+      stars = 3;
+      bonusMoney = 50;
+      bonusXp = 20;
+    } else if (finalTime <= 10.0) {
+      stars = 2;
+      bonusMoney = 25;
+      bonusXp = 10;
+    } else {
+      stars = 1;
+      bonusMoney = 0;
+      bonusXp = 0;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _challengeSeconds = finalTime;
+
+      _pickupChallengeSolved = true;
+
+      _pickupStars = stars;
+      _pickupBonusMoney = bonusMoney;
+      _pickupBonusXp = bonusXp;
+    });
+
+    // Ergebnis kurz anzeigen, bevor das Spiel weitergeht.
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+
+    if (!mounted) {
+      return;
+    }
+
+    _game.completePickup();
+  }
+
+  // ------------------------------------------
+  // NAMEN
+  // ------------------------------------------
 
   String _cargoName(CargoType cargoType) {
     switch (cargoType) {
@@ -158,6 +315,10 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
+  // ------------------------------------------
+  // STEUERUNG
+  // ------------------------------------------
+
   void _startGas() {
     if (_showPickupOverlay) {
       return;
@@ -177,6 +338,10 @@ class _GamePageState extends State<GamePage> {
   void _releasePedal() {
     _game.setThrottle(0);
   }
+
+  // ------------------------------------------
+  // BUILD
+  // ------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -284,16 +449,18 @@ class _GamePageState extends State<GamePage> {
           ),
 
           // ------------------------------------------
-          // ABHOLSTATION / CHALLENGE-GRUNDLAGE
+          // ABHOLSTATION
           // ------------------------------------------
           if (_showPickupOverlay)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withValues(alpha: 0.48),
+                color: Colors.black.withValues(alpha: 0.55),
                 child: SafeArea(
                   child: Center(
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 470),
+                      constraints: BoxConstraints(
+                        maxWidth: _pickupChallengeRunning ? 560 : 470,
+                      ),
                       margin: const EdgeInsets.symmetric(horizontal: 24),
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
@@ -311,67 +478,9 @@ class _GamePageState extends State<GamePage> {
                           ),
                         ],
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.inventory_2_rounded,
-                            color: Color(0xFFF2B84B),
-                            size: 42,
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'ABHOLSTATION',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${_cargoName(widget.mission.cargoType)} steht zur Abholung bereit.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          const Text(
-                            'Die Bonus-Challenge kommt im nächsten Schritt.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: _quickLoadCargo,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFFF2B84B),
-                                foregroundColor: const Color(0xFF2C2517),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                              ),
-                              icon: const Icon(Icons.local_shipping_rounded),
-                              label: const Text(
-                                'SCHNELL BELADEN',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: _pickupChallengeRunning
+                          ? _buildPackageChallenge()
+                          : _buildPickupMenu(),
                     ),
                   ),
                 ),
@@ -444,6 +553,20 @@ class _GamePageState extends State<GamePage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (_pickupBonusMoney > 0 || _pickupBonusXp > 0) ...[
+                          const SizedBox(height: 5),
+                          Text(
+                            'inkl. Abholbonus: '
+                            '+$_pickupBonusMoney Geld / '
+                            '+$_pickupBonusXp XP',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -482,7 +605,298 @@ class _GamePageState extends State<GamePage> {
       ),
     );
   }
+
+  // ------------------------------------------
+  // ABHOLMENÜ
+  // ------------------------------------------
+
+  Widget _buildPickupMenu() {
+    final bool packageChallengeAvailable =
+        widget.mission.cargoType == CargoType.parcel;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.inventory_2_rounded,
+          color: Color(0xFFF2B84B),
+          size: 42,
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'ABHOLSTATION',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${_cargoName(widget.mission.cargoType)} steht zur Abholung bereit.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white70, fontSize: 15),
+        ),
+        const SizedBox(height: 20),
+
+        if (packageChallengeAvailable) ...[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _startPackageChallenge,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFF2B84B),
+                foregroundColor: const Color(0xFF2C2517),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              icon: const Icon(Icons.stars_rounded),
+              label: const Text(
+                'BONUS-CHALLENGE STARTEN',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Finde die richtige Sendung möglichst schnell.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _quickLoadCargo,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white38),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: const Icon(Icons.local_shipping_rounded),
+            label: const Text(
+              'SCHNELL BELADEN',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+          ),
+        ),
+
+        if (!packageChallengeAvailable) ...[
+          const SizedBox(height: 10),
+          const Text(
+            'Eine eigene Bonus-Challenge für diese Ladung folgt später.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ------------------------------------------
+  // PAKET-CHALLENGE
+  // ------------------------------------------
+
+  Widget _buildPackageChallenge() {
+    if (_pickupChallengeSolved) {
+      return _buildChallengeResult();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.search_rounded, color: Color(0xFFF2B84B), size: 36),
+        const SizedBox(height: 6),
+        const Text(
+          'FINDE DIE RICHTIGE SENDUNG',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 19,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'GESUCHT',
+          style: TextStyle(
+            color: Colors.white60,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          'SENDUNG #$_targetPackageNumber',
+          style: const TextStyle(
+            color: Color(0xFFFFD866),
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '${_challengeSeconds.toStringAsFixed(1)} s',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _packageNumbers.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.25,
+          ),
+          itemBuilder: (context, index) {
+            final int packageNumber = _packageNumbers[index];
+
+            return Material(
+              color: const Color(0xFFD9903D),
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  _selectPackage(packageNumber);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFFFD080),
+                      width: 2,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.inventory_2_rounded,
+                        color: Color(0xFF5C4520),
+                        size: 24,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '#$packageNumber',
+                        style: const TextStyle(
+                          color: Color(0xFF332617),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
+        const Text(
+          'Falsche Sendung? Kein Problem – die Zeit läuft nur weiter.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white54, fontSize: 11),
+        ),
+      ],
+    );
+  }
+
+  // ------------------------------------------
+  // CHALLENGE-ERGEBNIS
+  // ------------------------------------------
+
+  Widget _buildChallengeResult() {
+    String rating;
+
+    if (_pickupStars == 3) {
+      rating = 'PERFEKT!';
+    } else if (_pickupStars == 2) {
+      rating = 'GUT!';
+    } else {
+      rating = 'GESCHAFFT!';
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.check_circle_rounded,
+          color: Color(0xFF7DDB83),
+          size: 44,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          rating,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List<Widget>.generate(3, (int index) {
+            final bool active = index < _pickupStars;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Icon(
+                active ? Icons.star_rounded : Icons.star_border_rounded,
+                color: active ? const Color(0xFFFFD866) : Colors.white38,
+                size: 32,
+              ),
+            );
+          }),
+        ),
+
+        const SizedBox(height: 8),
+        Text(
+          '${_challengeSeconds.toStringAsFixed(1)} Sekunden',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+
+        if (_pickupBonusMoney > 0 || _pickupBonusXp > 0)
+          Text(
+            '+$_pickupBonusMoney Geld   •   +$_pickupBonusXp XP',
+            style: const TextStyle(
+              color: Color(0xFFFFD866),
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          )
+        else
+          const Text(
+            'Kein Bonus – normale Missionsbelohnung bleibt erhalten.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+      ],
+    );
+  }
 }
+
+// ----------------------------------------------------
+// HUD-WERT
+// ----------------------------------------------------
 
 class _HudValue extends StatelessWidget {
   const _HudValue({required this.icon, required this.value});
@@ -517,6 +931,10 @@ class _HudValue extends StatelessWidget {
     );
   }
 }
+
+// ----------------------------------------------------
+// FAHRSTEUERUNG
+// ----------------------------------------------------
 
 class _ControlButton extends StatelessWidget {
   const _ControlButton({

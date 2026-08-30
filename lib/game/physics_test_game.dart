@@ -2,16 +2,23 @@ import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
 
+import '../missions/delivery_mission.dart';
+
 import 'components/physics_vehicle.dart';
 import 'components/physics_wheel.dart';
 
 class PhysicsTestGame extends Forge2DGame {
-  PhysicsTestGame({this.onCargoPickedUp, this.onDeliveryCompleted})
-    : super(
-        gravity: Vector2(0, 9.81),
-        metersToPixels: 32,
-        camera: CameraComponent.withFixedResolution(width: 900, height: 400),
-      );
+  PhysicsTestGame({
+    required this.mission,
+    this.onCargoPickedUp,
+    this.onDeliveryCompleted,
+  }) : super(
+         gravity: Vector2(0, 9.81),
+         metersToPixels: 32,
+         camera: CameraComponent.withFixedResolution(width: 900, height: 400),
+       );
+
+  final DeliveryMission mission;
 
   final VoidCallback? onCargoPickedUp;
 
@@ -28,9 +35,6 @@ class PhysicsTestGame extends Forge2DGame {
   bool _deliveryCompleted = false;
 
   double _throttle = 0;
-
-  int money = 0;
-  int xp = 0;
 
   static const double _motorSpeed = 18;
   static const double _motorTorque = 45;
@@ -264,13 +268,7 @@ class PhysicsTestGame extends Forge2DGame {
 
     vehicle.hideCargo();
 
-    const int moneyReward = 250;
-    const int xpReward = 100;
-
-    money += moneyReward;
-    xp += xpReward;
-
-    onDeliveryCompleted?.call(moneyReward, xpReward);
+    onDeliveryCompleted?.call(mission.moneyReward, mission.xpReward);
   }
 
   void _createSuspension() {

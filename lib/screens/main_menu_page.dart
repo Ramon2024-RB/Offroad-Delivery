@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../progress/player_progress_controller.dart';
-import 'game_page.dart';
+import 'mission_selection_page.dart';
 
 class MainMenuPage extends StatefulWidget {
   const MainMenuPage({required this.progressController, super.key});
@@ -48,7 +48,8 @@ class _MainMenuPageState extends State<MainMenuPage> {
 
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => GamePage(progressController: widget.progressController),
+        builder: (_) =>
+            MissionSelectionPage(progressController: widget.progressController),
       ),
     );
 

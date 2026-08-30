@@ -2,12 +2,18 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../game/physics_test_game.dart';
+import '../missions/delivery_mission.dart';
 import '../progress/player_progress_controller.dart';
 
 class GamePage extends StatefulWidget {
-  const GamePage({required this.progressController, super.key});
+  const GamePage({
+    required this.progressController,
+    required this.mission,
+    super.key,
+  });
 
   final PlayerProgressController progressController;
+  final DeliveryMission mission;
 
   @override
   State<GamePage> createState() => _GamePageState();
@@ -32,13 +38,15 @@ class _GamePageState extends State<GamePage> {
     widget.progressController.addListener(_onProgressChanged);
 
     _game = PhysicsTestGame(
+      mission: widget.mission,
       onCargoPickedUp: () {
         if (!mounted) {
           return;
         }
 
         setState(() {
-          _missionText = 'Paket geladen – fahre zum Kunden';
+          _missionText =
+              '${_cargoName(widget.mission.cargoType)} geladen – fahre zum ${_destinationName(widget.mission.destinationType)}';
 
           _missionIcon = Icons.local_shipping_rounded;
         });
@@ -84,6 +92,38 @@ class _GamePageState extends State<GamePage> {
       moneyReward: moneyReward,
       xpReward: xpReward,
     );
+  }
+
+  String _cargoName(CargoType cargoType) {
+    switch (cargoType) {
+      case CargoType.parcel:
+        return 'Paket';
+
+      case CargoType.food:
+        return 'Vorräte';
+
+      case CargoType.buildingMaterials:
+        return 'Baumaterial';
+
+      case CargoType.vehicleParts:
+        return 'Ersatzteile';
+    }
+  }
+
+  String _destinationName(DestinationType destinationType) {
+    switch (destinationType) {
+      case DestinationType.house:
+        return 'Wohnhaus';
+
+      case DestinationType.mountainHut:
+        return 'Berghütte';
+
+      case DestinationType.constructionSite:
+        return 'Baustelle';
+
+      case DestinationType.workshop:
+        return 'Werkstatt';
+    }
   }
 
   void _startGas() {

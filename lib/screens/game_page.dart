@@ -10,6 +10,7 @@ import '../progress/mission_record.dart';
 import '../progress/player_progress_controller.dart';
 import '../routes/route_catalog.dart';
 import '../routes/route_definition.dart';
+import '../routes/route_section.dart';
 
 class GamePage extends StatefulWidget {
   const GamePage({
@@ -94,6 +95,14 @@ class _GamePageState extends State<GamePage> {
 
   double _missionAccumulatedSeconds = 0;
   double _missionSeconds = 0;
+
+  // ------------------------------------------
+  // ENTWICKLUNGSANZEIGE – STRECKENABSCHNITT
+  // ------------------------------------------
+
+  Timer? _routeSectionTimer;
+
+  RouteSection? _displayedRouteSection;
 
   @override
   void initState() {
@@ -181,12 +190,15 @@ class _GamePageState extends State<GamePage> {
         _handleMissionFailed();
       },
     );
+
+    _startRouteSectionDisplayTimer();
   }
 
   @override
   void dispose() {
     _challengeTimer?.cancel();
     _missionTimer?.cancel();
+    _routeSectionTimer?.cancel();
 
     widget.progressController.removeListener(_onProgressChanged);
 
@@ -199,6 +211,71 @@ class _GamePageState extends State<GamePage> {
     }
 
     setState(() {});
+  }
+
+  // ------------------------------------------
+  // STRECKENABSCHNITT – TESTANZEIGE
+  // ------------------------------------------
+
+  void _startRouteSectionDisplayTimer() {
+    _routeSectionTimer?.cancel();
+
+    _routeSectionTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (!mounted) {
+        return;
+      }
+
+      final RouteSection? currentSection = _game.currentRouteSection;
+
+      if (identical(currentSection, _displayedRouteSection)) {
+        return;
+      }
+
+      setState(() {
+        _displayedRouteSection = currentSection;
+      });
+    });
+  }
+
+  String _surfaceName(SurfaceType surfaceType) {
+    switch (surfaceType) {
+      case SurfaceType.asphalt:
+        return 'Asphalt';
+
+      case SurfaceType.gravel:
+        return 'Schotter';
+
+      case SurfaceType.dirt:
+        return 'Erde';
+
+      case SurfaceType.mud:
+        return 'Schlamm';
+
+      case SurfaceType.rock:
+        return 'Fels';
+    }
+  }
+
+  String _biomeName(BiomeType biomeType) {
+    switch (biomeType) {
+      case BiomeType.forest:
+        return 'Wald';
+
+      case BiomeType.fields:
+        return 'Felder';
+
+      case BiomeType.mountains:
+        return 'Berge';
+
+      case BiomeType.quarry:
+        return 'Steinbruch';
+
+      case BiomeType.industrial:
+        return 'Industrie';
+
+      case BiomeType.rural:
+        return 'Ländlich';
+    }
   }
 
   // ------------------------------------------
@@ -358,10 +435,6 @@ class _GamePageState extends State<GamePage> {
 
     final double finalMissionTime = _stopMissionTimer();
 
-    // ------------------------------------------
-    // GESAMTE MISSIONSBEWERTUNG
-    // ------------------------------------------
-
     final MissionRatingResult rating = widget.mission.evaluateMission(
       timeSeconds: finalMissionTime,
       cargoConditionPercent: _cargoConditionPercent,
@@ -372,10 +445,6 @@ class _GamePageState extends State<GamePage> {
     final int totalMoneyReward = moneyReward + _pickupBonusMoney;
 
     final int totalXpReward = xpReward + _pickupBonusXp;
-
-    // ------------------------------------------
-    // BISHERIGEN REKORD LADEN
-    // ------------------------------------------
 
     final MissionRecord? previousRecord = await widget.progressController
         .loadMissionRecord(widget.mission.id);
@@ -391,10 +460,6 @@ class _GamePageState extends State<GamePage> {
     final bool newBestStars =
         previousRecord == null || totalStars > previousRecord.bestStars;
 
-    // ------------------------------------------
-    // NEUES ERGEBNIS SPEICHERN
-    // ------------------------------------------
-
     final MissionRecord savedRecord = await widget.progressController
         .recordMissionResult(
           missionId: widget.mission.id,
@@ -405,10 +470,6 @@ class _GamePageState extends State<GamePage> {
     if (!mounted) {
       return;
     }
-
-    // ------------------------------------------
-    // BELOHNUNG SPEICHERN
-    // ------------------------------------------
 
     await widget.progressController.addRewards(
       moneyReward: totalMoneyReward,
@@ -421,27 +482,20 @@ class _GamePageState extends State<GamePage> {
 
     setState(() {
       _missionSeconds = finalMissionTime;
-
       _missionTimeStars = rating.timeStars;
-
       _cargoConditionStars = rating.cargoConditionStars;
-
       _missionTotalStars = totalStars;
 
       _moneyReward = totalMoneyReward;
-
       _xpReward = totalXpReward;
 
       _savedBestTime = savedRecord.bestTimeSeconds;
-
       _savedBestStars = savedRecord.bestStars;
 
       _newBestTime = newBestTime;
-
       _newBestStars = newBestStars;
 
       _missionText = 'Lieferung abgeschlossen';
-
       _missionIcon = Icons.check_circle_rounded;
 
       _showDeliveryCompleted = true;
@@ -660,7 +714,6 @@ class _GamePageState extends State<GamePage> {
   @override
   Widget build(BuildContext context) {
     final int money = widget.progressController.money;
-
     final int xp = widget.progressController.xp;
 
     return Scaffold(
@@ -780,6 +833,53 @@ class _GamePageState extends State<GamePage> {
             ),
 
           // ------------------------------------------
+          // ENTWICKLUNGSANZEIGE – STRECKE
+          // ------------------------------------------
+          if (!_showDeliveryCompleted &&
+              !_showMissionFailed &&
+              _displayedRouteSection != null)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 68),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.62),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.terrain_rounded,
+                          color: Color(0xFFFFD866),
+                          size: 17,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_surfaceName(_displayedRouteSection!.surfaceType)}'
+                          ' • '
+                          '${_biomeName(_displayedRouteSection!.biomeType)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // ------------------------------------------
           // ABHOLSTATION
           // ------------------------------------------
           if (_showPickupOverlay && !_showMissionFailed)
@@ -823,7 +923,6 @@ class _GamePageState extends State<GamePage> {
                     builder:
                         (BuildContext context, BoxConstraints constraints) {
                           final double availableWidth = constraints.maxWidth;
-
                           final double availableHeight = constraints.maxHeight;
 
                           final double cardWidth = min(

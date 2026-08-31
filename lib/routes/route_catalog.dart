@@ -1,6 +1,7 @@
 import 'package:flame_forge2d/flame_forge2d.dart';
 
 import 'route_definition.dart';
+import 'route_section.dart';
 
 class RouteCatalog {
   RouteCatalog._();
@@ -149,6 +150,82 @@ class RouteCatalog {
       Vector2(308, 8.0),
       Vector2(312, 8.0),
       Vector2(316, 8.0),
+    ],
+
+    // ------------------------------------------
+    // STRECKENABSCHNITTE
+    // ------------------------------------------
+    //
+    // Diese Abschnitte beschreiben zunächst nur,
+    // welcher Untergrund und welche Umgebung an
+    // welcher Stelle der Route vorgesehen sind.
+    //
+    // Physik und Grafik werden erst später daran
+    // gekoppelt.
+    sections: const <RouteSection>[
+      RouteSection(
+        id: 'route_01_depot',
+        startX: -10,
+        endX: 30,
+        surfaceType: SurfaceType.asphalt,
+        biomeType: BiomeType.rural,
+      ),
+
+      RouteSection(
+        id: 'route_01_forest_entry',
+        startX: 30,
+        endX: 68,
+        surfaceType: SurfaceType.dirt,
+        biomeType: BiomeType.forest,
+      ),
+
+      RouteSection(
+        id: 'route_01_rocky_hills',
+        startX: 68,
+        endX: 128,
+        surfaceType: SurfaceType.rock,
+        biomeType: BiomeType.mountains,
+      ),
+
+      RouteSection(
+        id: 'route_01_forest_valley',
+        startX: 128,
+        endX: 176,
+        surfaceType: SurfaceType.gravel,
+        biomeType: BiomeType.forest,
+      ),
+
+      RouteSection(
+        id: 'route_01_technical_mountains',
+        startX: 176,
+        endX: 220,
+        surfaceType: SurfaceType.rock,
+        biomeType: BiomeType.mountains,
+      ),
+
+      RouteSection(
+        id: 'route_01_muddy_fields',
+        startX: 220,
+        endX: 236,
+        surfaceType: SurfaceType.mud,
+        biomeType: BiomeType.fields,
+      ),
+
+      RouteSection(
+        id: 'route_01_final_climb',
+        startX: 236,
+        endX: 272,
+        surfaceType: SurfaceType.rock,
+        biomeType: BiomeType.mountains,
+      ),
+
+      RouteSection(
+        id: 'route_01_destination',
+        startX: 272,
+        endX: 316,
+        surfaceType: SurfaceType.asphalt,
+        biomeType: BiomeType.rural,
+      ),
     ],
 
     // Das Fahrzeug startet in der bisherigen Strecke bei x = 8 / y = 5.

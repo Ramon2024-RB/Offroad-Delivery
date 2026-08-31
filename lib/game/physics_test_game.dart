@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../missions/delivery_mission.dart';
 import '../routes/route_catalog.dart';
 import '../routes/route_definition.dart';
+import '../routes/route_section.dart';
 import 'components/physics_vehicle.dart';
 import 'components/physics_wheel.dart';
 
@@ -29,9 +30,6 @@ class PhysicsTestGame extends Forge2DGame {
   final DeliveryMission mission;
 
   /// Individuell gestaltete Route, die für diese Mission gefahren wird.
-  ///
-  /// Solange eine Mission noch keine eigene Route auswählt,
-  /// verwenden wir Route 1 als Standard.
   final RouteDefinition route;
 
   final VoidCallback? onPickupStationReached;
@@ -60,6 +58,74 @@ class PhysicsTestGame extends Forge2DGame {
   bool get cargoPickedUp => _cargoPickedUp;
 
   double _throttle = 0;
+
+  // ------------------------------------------
+  // AKTUELLER STRECKENABSCHNITT
+  // ------------------------------------------
+
+  RouteSection? _currentRouteSection;
+
+  RouteSection? get currentRouteSection => _currentRouteSection;
+
+  SurfaceType? get currentSurfaceType => _currentRouteSection?.surfaceType;
+
+  BiomeType? get currentBiomeType => _currentRouteSection?.biomeType;
+
+  // ------------------------------------------
+  // UNTERGRUNDPHYSIK
+  // ------------------------------------------
+
+  /// Bestimmt, wie stark der Motor auf dem aktuellen
+  /// Untergrund seine Leistung auf die Straße bringt.
+  ///
+  /// Asphalt ist unsere Referenz mit 100 %.
+  double get _surfaceMotorMultiplier {
+    switch (currentSurfaceType) {
+      case SurfaceType.asphalt:
+        return 1.00;
+
+      case SurfaceType.gravel:
+        return 0.92;
+
+      case SurfaceType.dirt:
+        return 0.87;
+
+      case SurfaceType.mud:
+        return 0.68;
+
+      case SurfaceType.rock:
+        return 0.95;
+
+      case null:
+        return 1.00;
+    }
+  }
+
+  /// Zusätzlicher Rollwiderstand des Untergrunds.
+  ///
+  /// Ein höherer Wert sorgt dafür, dass das Fahrzeug
+  /// beim Loslassen des Pedals schneller Geschwindigkeit verliert.
+  double get _surfaceCoastBrakeMultiplier {
+    switch (currentSurfaceType) {
+      case SurfaceType.asphalt:
+        return 1.00;
+
+      case SurfaceType.gravel:
+        return 1.15;
+
+      case SurfaceType.dirt:
+        return 1.30;
+
+      case SurfaceType.mud:
+        return 2.20;
+
+      case SurfaceType.rock:
+        return 1.10;
+
+      case null:
+        return 1.00;
+    }
+  }
 
   // ------------------------------------------
   // LADUNGSZUSTAND / LANDUNGEN
@@ -166,6 +232,8 @@ class PhysicsTestGame extends Forge2DGame {
 
     _createSuspension();
 
+    _updateCurrentRouteSection(startPosition.x);
+
     camera.viewfinder.position = Vector2(
       startPosition.x + 4,
       startPosition.y + 1,
@@ -206,6 +274,8 @@ class PhysicsTestGame extends Forge2DGame {
 
     camera.viewfinder.position = Vector2(vehicleX + 5, vehicleY + 0.5);
 
+    _updateCurrentRouteSection(vehicleX);
+
     if (_missionFailed) {
       return;
     }
@@ -228,16 +298,35 @@ class PhysicsTestGame extends Forge2DGame {
   }
 
   // ------------------------------------------
+  // STRECKENABSCHNITT
+  // ------------------------------------------
+
+  void _updateCurrentRouteSection(double vehicleX) {
+    final RouteSection? section = route.sectionAtX(vehicleX);
+
+    if (identical(section, _currentRouteSection)) {
+      return;
+    }
+
+    _currentRouteSection = section;
+  }
+
+  // ------------------------------------------
   // FAHRPHYSIK
   // ------------------------------------------
 
   void _updateDrivePhysics(double dt) {
     final double horizontalSpeed = vehicle.body.linearVelocity.x;
 
+    final double currentMotorSpeed = _motorSpeed * _surfaceMotorMultiplier;
+
     if (_throttle == 0) {
       rearWheelJoint.motorSpeed = 0;
 
-      _applyHorizontalBrake(_coastBrakeStrength, dt);
+      _applyHorizontalBrake(
+        _coastBrakeStrength * _surfaceCoastBrakeMultiplier,
+        dt,
+      );
 
       return;
     }
@@ -251,7 +340,7 @@ class PhysicsTestGame extends Forge2DGame {
         return;
       }
 
-      rearWheelJoint.motorSpeed = _motorSpeed;
+      rearWheelJoint.motorSpeed = currentMotorSpeed;
 
       return;
     }
@@ -265,7 +354,7 @@ class PhysicsTestGame extends Forge2DGame {
         return;
       }
 
-      rearWheelJoint.motorSpeed = -_motorSpeed;
+      rearWheelJoint.motorSpeed = -currentMotorSpeed;
     }
   }
 
@@ -917,7 +1006,6 @@ class DeliveryHouse extends DeliveryDestination {
     canvas.drawCircle(const Offset(2.10, -1.05), 0.07, _roofShadowPaint);
 
     _drawWindow(canvas, -0.55, -2.25);
-
     _drawWindow(canvas, 2.45, -2.25);
 
     for (int i = 0; i < 7; i++) {
@@ -929,7 +1017,6 @@ class DeliveryHouse extends DeliveryDestination {
     final Rect window = Rect.fromLTWH(x, y, 0.78, 0.82);
 
     canvas.drawRect(window, _windowPaint);
-
     canvas.drawRect(window, _windowFramePaint);
 
     canvas.drawLine(
@@ -954,13 +1041,9 @@ class DeliveryMountainHut extends DeliveryDestination {
   DeliveryMountainHut({required super.position});
 
   final Paint _woodPaint = Paint()..color = const Color(0xFF8A603E);
-
   final Paint _darkWoodPaint = Paint()..color = const Color(0xFF5D3D29);
-
   final Paint _roofPaint = Paint()..color = const Color(0xFF3F4542);
-
   final Paint _windowPaint = Paint()..color = const Color(0xFF9ED2DF);
-
   final Paint _stonePaint = Paint()..color = const Color(0xFF77756E);
 
   @override
@@ -1005,13 +1088,9 @@ class DeliveryConstructionSite extends DeliveryDestination {
   DeliveryConstructionSite({required super.position});
 
   final Paint _concretePaint = Paint()..color = const Color(0xFFB5B5AE);
-
   final Paint _darkConcretePaint = Paint()..color = const Color(0xFF858680);
-
   final Paint _woodPaint = Paint()..color = const Color(0xFF9A7044);
-
   final Paint _warningPaint = Paint()..color = const Color(0xFFF2B84B);
-
   final Paint _darkPaint = Paint()..color = const Color(0xFF353A3C);
 
   @override
@@ -1061,11 +1140,8 @@ class DeliveryWorkshop extends DeliveryDestination {
   DeliveryWorkshop({required super.position});
 
   final Paint _wallPaint = Paint()..color = const Color(0xFF8A9395);
-
   final Paint _darkWallPaint = Paint()..color = const Color(0xFF60686A);
-
   final Paint _roofPaint = Paint()..color = const Color(0xFF404648);
-
   final Paint _garageDoorPaint = Paint()..color = const Color(0xFFCDD2D2);
 
   final Paint _doorLinePaint = Paint()
@@ -1113,13 +1189,9 @@ class PhysicsLandscape extends PositionComponent {
   PhysicsLandscape() : super(priority: -100);
 
   final Paint _farMountainPaint = Paint()..color = const Color(0xFF9DB4BD);
-
   final Paint _middleMountainPaint = Paint()..color = const Color(0xFF78949B);
-
   final Paint _hillPaint = Paint()..color = const Color(0xFF587D57);
-
   final Paint _forestPaint = Paint()..color = const Color(0xFF3D6748);
-
   final Paint _trunkPaint = Paint()..color = const Color(0xFF4B4334);
 
   @override
@@ -1338,7 +1410,6 @@ class PhysicsTerrain extends BodyComponent {
 
     for (int i = 0; i < _points.length - 1; i++) {
       final Vector2 start = _points[i];
-
       final Vector2 end = _points[i + 1];
 
       if (x >= start.x && x <= end.x) {

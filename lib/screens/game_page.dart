@@ -34,6 +34,10 @@ class _GamePageState extends State<GamePage> {
   bool _showPickupOverlay = false;
   bool _showDeliveryCompleted = false;
 
+  // Verhindert, dass der Missionsabschluss während
+  // asynchroner Speicherzugriffe mehrfach ausgelöst wird.
+  bool _deliveryCompletionStarted = false;
+
   bool _pickupChallengeRunning = false;
   bool _pickupChallengeSolved = false;
 
@@ -50,6 +54,20 @@ class _GamePageState extends State<GamePage> {
 
   int _moneyReward = 0;
   int _xpReward = 0;
+
+  // ------------------------------------------
+  // MISSIONSBEWERTUNG
+  // ------------------------------------------
+
+  int _missionTimeStars = 0;
+  int _cargoConditionStars = 0;
+  int _missionTotalStars = 0;
+
+  // Noch testweise 100 %.
+  //
+  // Im nächsten Schritt wird dieser Wert durch
+  // harte Landungen und Kollisionen verändert.
+  double _cargoConditionPercent = 100.0;
 
   // ------------------------------------------
   // MISSIONSREKORD
@@ -73,8 +91,6 @@ class _GamePageState extends State<GamePage> {
 
   double _missionAccumulatedSeconds = 0;
   double _missionSeconds = 0;
-
-  int _missionTimeStars = 0;
 
   @override
   void initState() {
@@ -196,6 +212,7 @@ class _GamePageState extends State<GamePage> {
           1000;
 
       _missionAccumulatedSeconds += currentSegmentSeconds;
+
       _missionSeconds = _missionAccumulatedSeconds;
     }
 
@@ -234,18 +251,11 @@ class _GamePageState extends State<GamePage> {
     return _missionSeconds;
   }
 
-  // ------------------------------------------
-  // MISSIONSZEIT AUSWERTEN
-  // ------------------------------------------
-
-  int _calculateMissionTimeStars(double seconds) {
-    return widget.mission.evaluateMissionTime(seconds);
-  }
-
   String _formatMissionTime(double seconds) {
     final int totalSeconds = seconds.floor();
 
     final int minutes = totalSeconds ~/ 60;
+
     final int remainingSeconds = totalSeconds % 60;
 
     final String secondsText = remainingSeconds.toString().padLeft(2, '0');
@@ -258,15 +268,26 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   Future<void> _handleDeliveryCompleted(int moneyReward, int xpReward) async {
-    if (!mounted || _showDeliveryCompleted) {
+    if (!mounted || _deliveryCompletionStarted) {
       return;
     }
+
+    _deliveryCompletionStarted = true;
 
     _game.setThrottle(0);
 
     final double finalMissionTime = _stopMissionTimer();
 
-    final int timeStars = _calculateMissionTimeStars(finalMissionTime);
+    // ------------------------------------------
+    // GESAMTE MISSIONSBEWERTUNG
+    // ------------------------------------------
+
+    final MissionRatingResult rating = widget.mission.evaluateMission(
+      timeSeconds: finalMissionTime,
+      cargoConditionPercent: _cargoConditionPercent,
+    );
+
+    final int totalStars = rating.totalStars;
 
     final int totalMoneyReward = moneyReward + _pickupBonusMoney;
 
@@ -288,7 +309,7 @@ class _GamePageState extends State<GamePage> {
         finalMissionTime < previousRecord.bestTimeSeconds;
 
     final bool newBestStars =
-        previousRecord == null || timeStars > previousRecord.bestStars;
+        previousRecord == null || totalStars > previousRecord.bestStars;
 
     // ------------------------------------------
     // NEUES ERGEBNIS SPEICHERN
@@ -298,7 +319,7 @@ class _GamePageState extends State<GamePage> {
         .recordMissionResult(
           missionId: widget.mission.id,
           timeSeconds: finalMissionTime,
-          stars: timeStars,
+          stars: totalStars,
         );
 
     if (!mounted) {
@@ -320,9 +341,15 @@ class _GamePageState extends State<GamePage> {
 
     setState(() {
       _missionSeconds = finalMissionTime;
-      _missionTimeStars = timeStars;
+
+      _missionTimeStars = rating.timeStars;
+
+      _cargoConditionStars = rating.cargoConditionStars;
+
+      _missionTotalStars = totalStars;
 
       _moneyReward = totalMoneyReward;
+
       _xpReward = totalXpReward;
 
       _savedBestTime = savedRecord.bestTimeSeconds;
@@ -330,9 +357,11 @@ class _GamePageState extends State<GamePage> {
       _savedBestStars = savedRecord.bestStars;
 
       _newBestTime = newBestTime;
+
       _newBestStars = newBestStars;
 
       _missionText = 'Lieferung abgeschlossen';
+
       _missionIcon = Icons.check_circle_rounded;
 
       _showDeliveryCompleted = true;
@@ -459,6 +488,7 @@ class _GamePageState extends State<GamePage> {
 
     setState(() {
       _challengeSeconds = finalTime;
+
       _pickupChallengeSolved = true;
 
       _pickupStars = stars;
@@ -700,12 +730,12 @@ class _GamePageState extends State<GamePage> {
                           final double availableHeight = constraints.maxHeight;
 
                           final double cardWidth = min(
-                            720,
+                            760,
                             availableWidth - 32,
                           ).toDouble();
 
                           final double cardHeight = min(
-                            320,
+                            340,
                             availableHeight - 28,
                           ).toDouble();
 
@@ -794,213 +824,248 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   Widget _buildCompletionSummary() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(
-          Icons.emoji_events_rounded,
-          color: Color(0xFFF2C94C),
-          size: 28,
-        ),
-        const SizedBox(height: 2),
-        const Text(
-          'LIEFERUNG ABGESCHLOSSEN!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.4,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          widget.mission.title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 7),
+    final bool hasCargoRating = widget.mission.cargoConditionRatingRule != null;
 
-        // ------------------------------------------
-        // MISSIONSZEIT
-        // ------------------------------------------
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: Colors.white12),
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.emoji_events_rounded,
+            color: Color(0xFFF2C94C),
+            size: 26,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'MISSIONSZEIT',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                _formatMissionTime(_missionSeconds),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 1),
-              _buildMissionTimeStars(),
 
-              if (_newBestTime || _newBestStars) ...[
-                const SizedBox(height: 2),
-                Text(
-                  _newBestTime && _newBestStars
-                      ? 'NEUER REKORD!'
-                      : _newBestTime
-                      ? 'NEUE BESTZEIT!'
-                      : 'NEUE BESTWERTUNG!',
-                  style: const TextStyle(
-                    color: Color(0xFF7DDB83),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ],
+          const SizedBox(height: 2),
+
+          const Text(
+            'LIEFERUNG ABGESCHLOSSEN!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.4,
+            ),
           ),
-        ),
 
-        const SizedBox(height: 6),
+          const SizedBox(height: 2),
 
-        // ------------------------------------------
-        // BESTLEISTUNG
-        // ------------------------------------------
-        if (_savedBestTime != null && _savedBestStars != null)
+          Text(
+            widget.mission.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 7),
+
+          // ------------------------------------------
+          // BEWERTUNG
+          // ------------------------------------------
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white10),
+              color: Colors.black.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: Colors.white12),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.emoji_events_outlined,
-                  color: Colors.white54,
-                  size: 14,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  'BESTE LEISTUNG: '
-                  '${_formatMissionTime(_savedBestTime!)}'
-                  '  •  $_savedBestStars/${widget.mission.timeRatingRule?.maxStars ?? 3} ⭐',
-                  style: const TextStyle(
-                    color: Colors.white60,
+                const Text(
+                  'MISSIONSBEWERTUNG',
+                  style: TextStyle(
+                    color: Colors.white54,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
                   ),
                 ),
+
+                const SizedBox(height: 4),
+
+                _RatingRow(
+                  label: 'ZEIT',
+                  value: _formatMissionTime(_missionSeconds),
+                  stars: _missionTimeStars,
+                  maxStars: widget.mission.timeRatingRule?.maxStars ?? 0,
+                ),
+
+                if (hasCargoRating) ...[
+                  const SizedBox(height: 3),
+                  _RatingRow(
+                    label: 'LADUNG',
+                    value: '${_cargoConditionPercent.toStringAsFixed(0)} %',
+                    stars: _cargoConditionStars,
+                    maxStars:
+                        widget.mission.cargoConditionRatingRule?.maxStars ?? 0,
+                  ),
+                ],
+
+                const SizedBox(height: 5),
+
+                Container(height: 1, color: Colors.white12),
+
+                const SizedBox(height: 4),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'GESAMT',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    _StarDisplay(
+                      stars: _missionTotalStars,
+                      maxStars: widget.mission.maxStars,
+                      size: 19,
+                    ),
+
+                    const SizedBox(width: 6),
+
+                    Text(
+                      '$_missionTotalStars/${widget.mission.maxStars}',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD866),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+
+                if (_newBestTime || _newBestStars) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    _newBestTime && _newBestStars
+                        ? 'NEUER REKORD!'
+                        : _newBestTime
+                        ? 'NEUE BESTZEIT!'
+                        : 'NEUE BESTWERTUNG!',
+                    style: const TextStyle(
+                      color: Color(0xFF7DDB83),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
 
-        const SizedBox(height: 6),
+          const SizedBox(height: 6),
 
-        // ------------------------------------------
-        // BELOHNUNG
-        // ------------------------------------------
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: Colors.white12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'GESAMTBELOHNUNG',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
+          // ------------------------------------------
+          // BESTLEISTUNG
+          // ------------------------------------------
+          if (_savedBestTime != null && _savedBestStars != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white10),
               ),
-              const SizedBox(height: 2),
-              Text(
-                '+$_moneyReward Geld  •  +$_xpReward XP',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFFFFD866),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.emoji_events_outlined,
+                    color: Colors.white54,
+                    size: 14,
+                  ),
+
+                  const SizedBox(width: 5),
+
+                  Flexible(
+                    child: Text(
+                      'BESTE LEISTUNG: '
+                      '${_formatMissionTime(_savedBestTime!)}'
+                      '  •  $_savedBestStars/${widget.mission.maxStars} ⭐',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              if (_pickupBonusMoney > 0 || _pickupBonusXp > 0) ...[
-                const SizedBox(height: 1),
+            ),
+
+          const SizedBox(height: 6),
+
+          // ------------------------------------------
+          // BELOHNUNG
+          // ------------------------------------------
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'GESAMTBELOHNUNG',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
                 Text(
-                  'Abholbonus: '
-                  '+$_pickupBonusMoney Geld / '
-                  '+$_pickupBonusXp XP',
+                  '+$_moneyReward Geld  •  +$_xpReward XP',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: Color(0xFF7DDB83),
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFFD866),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
+
+                if (_pickupBonusMoney > 0 || _pickupBonusXp > 0) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    'Abholbonus: '
+                    '+$_pickupBonusMoney Geld / '
+                    '+$_pickupBonusXp XP',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF7DDB83),
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMissionTimeStars() {
-    final int maxStars = widget.mission.ratingRules
-        .where(
-          (MissionRatingRule rule) =>
-              rule.category == MissionRatingCategory.deliveryTime,
-        )
-        .fold<int>(
-          0,
-          (int total, MissionRatingRule rule) => total + rule.maxStars,
-        );
-
-    final int visibleMaxStars = maxStars > 0 ? maxStars : 3;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List<Widget>.generate(visibleMaxStars, (int index) {
-        final bool active = index < _missionTimeStars;
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 1),
-          child: Icon(
-            active ? Icons.star_rounded : Icons.star_border_rounded,
-            color: active ? const Color(0xFFFFD866) : Colors.white30,
-            size: 19,
-          ),
-        );
-      }),
+        ],
+      ),
     );
   }
 
@@ -1023,22 +1088,11 @@ class _GamePageState extends State<GamePage> {
               letterSpacing: 1.1,
             ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List<Widget>.generate(3, (int index) {
-              final bool active = index < _pickupStars;
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Icon(
-                  active ? Icons.star_rounded : Icons.star_border_rounded,
-                  color: active ? const Color(0xFFFFD866) : Colors.white30,
-                  size: 26,
-                ),
-              );
-            }),
-          ),
+          const SizedBox(height: 4),
+
+          _StarDisplay(stars: _pickupStars, maxStars: 3, size: 26),
+
           const SizedBox(height: 16),
         ],
 
@@ -1097,7 +1151,9 @@ class _GamePageState extends State<GamePage> {
           color: Color(0xFFF2B84B),
           size: 42,
         ),
+
         const SizedBox(height: 10),
+
         const Text(
           'ABHOLSTATION',
           textAlign: TextAlign.center,
@@ -1108,13 +1164,16 @@ class _GamePageState extends State<GamePage> {
             letterSpacing: 1,
           ),
         ),
+
         const SizedBox(height: 8),
+
         Text(
           '${_cargoName(widget.mission.cargoType)} '
           'steht zur Abholung bereit.',
           textAlign: TextAlign.center,
           style: const TextStyle(color: Colors.white70, fontSize: 15),
         ),
+
         const SizedBox(height: 20),
 
         if (packageChallengeAvailable) ...[
@@ -1137,12 +1196,15 @@ class _GamePageState extends State<GamePage> {
               ),
             ),
           ),
+
           const SizedBox(height: 10),
+
           const Text(
             'Finde die richtige Sendung möglichst schnell.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white60, fontSize: 12),
           ),
+
           const SizedBox(height: 16),
         ],
 
@@ -1188,7 +1250,9 @@ class _GamePageState extends State<GamePage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         const Icon(Icons.search_rounded, color: Color(0xFFF2B84B), size: 36),
+
         const SizedBox(height: 6),
+
         const Text(
           'FINDE DIE RICHTIGE SENDUNG',
           textAlign: TextAlign.center,
@@ -1199,7 +1263,9 @@ class _GamePageState extends State<GamePage> {
             letterSpacing: 0.5,
           ),
         ),
+
         const SizedBox(height: 10),
+
         const Text(
           'GESUCHT',
           style: TextStyle(
@@ -1209,7 +1275,9 @@ class _GamePageState extends State<GamePage> {
             letterSpacing: 1.5,
           ),
         ),
+
         const SizedBox(height: 3),
+
         Text(
           'SENDUNG #$_targetPackageNumber',
           style: const TextStyle(
@@ -1218,7 +1286,9 @@ class _GamePageState extends State<GamePage> {
             fontWeight: FontWeight.w900,
           ),
         ),
+
         const SizedBox(height: 5),
+
         Text(
           '${_challengeSeconds.toStringAsFixed(1)} s',
           style: const TextStyle(
@@ -1227,6 +1297,7 @@ class _GamePageState extends State<GamePage> {
             fontWeight: FontWeight.bold,
           ),
         ),
+
         const SizedBox(height: 16),
 
         GridView.builder(
@@ -1317,7 +1388,9 @@ class _GamePageState extends State<GamePage> {
           color: Color(0xFF7DDB83),
           size: 44,
         ),
+
         const SizedBox(height: 8),
+
         Text(
           rating,
           style: const TextStyle(
@@ -1326,23 +1399,10 @@ class _GamePageState extends State<GamePage> {
             fontWeight: FontWeight.w900,
           ),
         ),
+
         const SizedBox(height: 6),
 
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List<Widget>.generate(3, (int index) {
-            final bool active = index < _pickupStars;
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Icon(
-                active ? Icons.star_rounded : Icons.star_border_rounded,
-                color: active ? const Color(0xFFFFD866) : Colors.white38,
-                size: 32,
-              ),
-            );
-          }),
-        ),
+        _StarDisplay(stars: _pickupStars, maxStars: 3, size: 32),
 
         const SizedBox(height: 8),
 
@@ -1369,6 +1429,92 @@ class _GamePageState extends State<GamePage> {
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white60, fontSize: 13),
           ),
+      ],
+    );
+  }
+}
+
+// ----------------------------------------------------
+// STERNEANZEIGE
+// ----------------------------------------------------
+
+class _StarDisplay extends StatelessWidget {
+  const _StarDisplay({
+    required this.stars,
+    required this.maxStars,
+    required this.size,
+  });
+
+  final int stars;
+  final int maxStars;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List<Widget>.generate(maxStars, (int index) {
+        final bool active = index < stars;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1),
+          child: Icon(
+            active ? Icons.star_rounded : Icons.star_border_rounded,
+            color: active ? const Color(0xFFFFD866) : Colors.white30,
+            size: size,
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ----------------------------------------------------
+// BEWERTUNGSZEILE
+// ----------------------------------------------------
+
+class _RatingRow extends StatelessWidget {
+  const _RatingRow({
+    required this.label,
+    required this.value,
+    required this.stars,
+    required this.maxStars,
+  });
+
+  final String label;
+  final String value;
+  final int stars;
+  final int maxStars;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 58,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+
+        _StarDisplay(stars: stars, maxStars: maxStars, size: 16),
       ],
     );
   }

@@ -70,7 +70,11 @@ class PhysicsVehicle extends BodyComponent {
       type: BodyType.dynamic,
       position: startPosition,
       linearDamping: 0.15,
-      angularDamping: 1.2,
+
+      // Weniger Rotationsdämpfung:
+      // Der Pickup kann sich bei Sprüngen und
+      // schrägen Landungen jetzt stärker drehen.
+      angularDamping: 0.55,
     );
 
     final Body vehicleBody = world.createBody(bodyDef);
@@ -105,8 +109,6 @@ class PhysicsVehicle extends BodyComponent {
   }
 
   void _drawLowerBody(Canvas canvas) {
-    // Wieder näher an den ursprünglichen,
-    // kompakteren Proportionen.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-2.1, -0.45, 4.2, 0.98),
@@ -115,7 +117,6 @@ class PhysicsVehicle extends BodyComponent {
       _bodyPaint,
     );
 
-    // Unterkante der Karosserie.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-1.90, 0.27, 3.75, 0.22),
@@ -126,7 +127,6 @@ class PhysicsVehicle extends BodyComponent {
   }
 
   void _drawTruckBed(Canvas canvas) {
-    // Ladefläche hinten links.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-2.02, -0.68, 1.62, 0.88),
@@ -135,19 +135,16 @@ class PhysicsVehicle extends BodyComponent {
       _bodyPaint,
     );
 
-    // Dunkle Innenkante.
     canvas.drawRect(
       const Rect.fromLTWH(-1.90, -0.72, 1.38, 0.13),
       _bedInsidePaint,
     );
 
-    // Vorderkante der Ladefläche.
     canvas.drawRect(
       const Rect.fromLTWH(-0.52, -0.80, 0.10, 0.98),
       _bodyShadowPaint,
     );
 
-    // Heckkante.
     canvas.drawRect(
       const Rect.fromLTWH(-2.03, -0.55, 0.08, 0.68),
       _bodyShadowPaint,
@@ -155,7 +152,6 @@ class PhysicsVehicle extends BodyComponent {
   }
 
   void _drawCabin(Canvas canvas) {
-    // Kabine etwas höher/kräftiger.
     final Path cabin = Path()
       ..moveTo(-0.48, -0.45)
       ..lineTo(-0.17, -1.42)
@@ -167,7 +163,6 @@ class PhysicsVehicle extends BodyComponent {
 
     canvas.drawPath(cabin, _bodyPaint);
 
-    // Hinteres Seitenfenster.
     final Path rearWindow = Path()
       ..moveTo(-0.06, -1.41)
       ..lineTo(0.40, -1.41)
@@ -177,7 +172,6 @@ class PhysicsVehicle extends BodyComponent {
 
     canvas.drawPath(rearWindow, _windowLightPaint);
 
-    // Vorderes Seitenfenster.
     final Path frontWindow = Path()
       ..moveTo(0.51, -1.41)
       ..lineTo(0.87, -1.41)
@@ -188,10 +182,8 @@ class PhysicsVehicle extends BodyComponent {
 
     canvas.drawPath(frontWindow, _windowPaint);
 
-    // B-Säule.
     canvas.drawRect(const Rect.fromLTWH(0.39, -1.45, 0.12, 0.91), _darkPaint);
 
-    // Hintere Tür.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-0.34, -0.52, 0.78, 0.90),
@@ -200,7 +192,6 @@ class PhysicsVehicle extends BodyComponent {
       _linePaint,
     );
 
-    // Vordere Tür.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(0.46, -0.52, 0.88, 0.90),
@@ -209,7 +200,6 @@ class PhysicsVehicle extends BodyComponent {
       _linePaint,
     );
 
-    // Türgriffe.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(0.12, -0.30, 0.22, 0.065),
@@ -242,12 +232,6 @@ class PhysicsVehicle extends BodyComponent {
   }
 
   void _drawWheelArches(Canvas canvas) {
-    // Die echten Räder sitzen bei x -1.45 und +1.45.
-    //
-    // Wir verlängern NICHT mehr die ganze Karosserie.
-    // Stattdessen werden die Radkästen optisch gezielt
-    // nach unten zu den Reifen geführt.
-
     final Rect rearOuterArch = Rect.fromCenter(
       center: const Offset(-1.45, 0.56),
       width: 1.18,
@@ -304,8 +288,6 @@ class PhysicsVehicle extends BodyComponent {
       _wheelArchPaint,
     );
 
-    // Kleine senkrechte Kotflügelenden geben
-    // dem Radkasten mehr Pickup-Form.
     canvas.drawLine(
       const Offset(-2.04, 0.50),
       const Offset(-2.04, 0.67),
@@ -332,7 +314,6 @@ class PhysicsVehicle extends BodyComponent {
   }
 
   void _drawDetails(Canvas canvas) {
-    // Hintere Stoßstange.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-2.20, 0.17, 0.32, 0.25),
@@ -341,7 +322,6 @@ class PhysicsVehicle extends BodyComponent {
       _darkPaint,
     );
 
-    // Vordere Stoßstange.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(1.90, 0.15, 0.34, 0.27),
@@ -350,7 +330,6 @@ class PhysicsVehicle extends BodyComponent {
       _darkPaint,
     );
 
-    // Rücklicht.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-2.05, -0.48, 0.13, 0.28),
@@ -359,7 +338,6 @@ class PhysicsVehicle extends BodyComponent {
       _rearLightPaint,
     );
 
-    // Scheinwerfer.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(1.92, -0.42, 0.18, 0.20),
@@ -368,7 +346,6 @@ class PhysicsVehicle extends BodyComponent {
       _headlightPaint,
     );
 
-    // Seitenschweller nur zwischen den Rädern.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-0.72, 0.39, 1.55, 0.10),

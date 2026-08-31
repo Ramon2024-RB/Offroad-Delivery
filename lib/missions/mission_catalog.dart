@@ -24,6 +24,7 @@ class MissionCatalog {
         ),
       ],
     ),
+
     DeliveryMission(
       id: 'food_mountain_hut_01',
       title: 'Vorräte zur Berghütte',
@@ -43,6 +44,7 @@ class MissionCatalog {
         ),
       ],
     ),
+
     DeliveryMission(
       id: 'building_materials_01',
       title: 'Material zur Baustelle',
@@ -62,10 +64,11 @@ class MissionCatalog {
         ),
       ],
     ),
+
     DeliveryMission(
       id: 'vehicle_parts_workshop_01',
       title: 'Ersatzteile zur Werkstatt',
-      description: 'Liefere dringend benötigte Fahrzeugteile zu einer abgelegenen Werkstatt.',
+      description: 'Liefere empfindliche Fahrzeugteile schnell und möglichst unbeschädigt zu einer abgelegenen Werkstatt.',
       cargoType: CargoType.vehicleParts,
       destinationType: DestinationType.workshop,
       difficulty: MissionDifficulty.hard,
@@ -73,11 +76,30 @@ class MissionCatalog {
       xpReward: 350,
       requiredLevel: 5,
       ratingRules: [
+        // --------------------------------------------------
+        // LIEFERZEIT
+        // Maximal 3 Sterne
+        // --------------------------------------------------
         MissionRatingRule(
           category: MissionRatingCategory.deliveryTime,
           maxStars: 3,
           threeStarTimeSeconds: 60,
           twoStarTimeSeconds: 90,
+        ),
+
+        // --------------------------------------------------
+        // LADUNGSZUSTAND
+        // Maximal 2 zusätzliche Sterne
+        //
+        // 90–100 % = ⭐⭐
+        // 70–89 %  = ⭐
+        // unter 70 % = 0 Sterne
+        // --------------------------------------------------
+        MissionRatingRule(
+          category: MissionRatingCategory.cargoCondition,
+          maxStars: 2,
+          perfectConditionPercent: 90,
+          goodConditionPercent: 70,
         ),
       ],
     ),

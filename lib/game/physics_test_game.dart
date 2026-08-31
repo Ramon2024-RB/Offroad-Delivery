@@ -38,8 +38,8 @@ class PhysicsTestGame extends Forge2DGame {
 
   double _throttle = 0;
 
-  static const double _motorSpeed = 18;
-  static const double _motorTorque = 45;
+  static const double _motorSpeed = 26;
+  static const double _motorTorque = 60;
 
   static const double _directionChangeSpeed = 0.75;
   static const double _brakeStrength = 8.0;
@@ -52,13 +52,41 @@ class PhysicsTestGame extends Forge2DGame {
   static const double _pickupX = 18.0;
 
   // ------------------------------------------
+  // LUFTSTEUERUNG
+  // ------------------------------------------
+
+  // Drehmoment, mit dem der Spieler das Fahrzeug
+  // während eines Sprungs beeinflussen kann.
+  //
+  // Der Wert ist bewusst begrenzt, damit die
+  // Luftsteuerung hilfreich bleibt, ohne dass sich
+  // der Pickup unnatürlich schnell drehen lässt.
+  static const double _airControlTorque = 32.0;
+
+  // Maximale Drehgeschwindigkeit des Fahrzeugs
+  // während der aktiven Luftsteuerung.
+  static const double _maxAirAngularVelocity = 3.4;
+
+  // Mindestabstand der Räder zum Terrain, ab dem
+  // das Fahrzeug als wirklich in der Luft gilt.
+  //
+  // Dadurch wird verhindert, dass die Luftsteuerung
+  // bereits bei kleinen Bodenwellen eingreift.
+  static const double _airborneGroundClearance = 0.12;
+
+  // ------------------------------------------
   // ZIELBEREICH
   // ------------------------------------------
 
-  static const double _deliveryDestinationX = 140.0;
+  static const double _deliveryDestinationX = 292.0;
   static const double _deliveryGroundY = 8.0;
-  static const double _deliveryZoneCenterX = _deliveryDestinationX - 4.0;
+
+  // Lieferzone direkt vor dem Gebäude.
+  // Mittelpunkt: x = 289
+  // Bereich:     x = 287 bis 291
+  static const double _deliveryZoneCenterX = 289.0;
   static const double _deliveryZoneHalfWidth = 2.0;
+
   static const double _deliveryMaxSpeed = 1.0;
 
   @override
@@ -129,11 +157,14 @@ class PhysicsTestGame extends Forge2DGame {
     }
 
     final double vehicleX = vehicle.body.position.x;
+
     final double vehicleY = vehicle.body.position.y;
 
     camera.viewfinder.position = Vector2(vehicleX + 5, vehicleY + 0.5);
 
     _updateDrivePhysics(dt);
+
+    _updateAirControl();
 
     _checkPickup(vehicleX);
 
@@ -221,6 +252,69 @@ class PhysicsTestGame extends Forge2DGame {
   }
 
   // ------------------------------------------
+  // LUFTSTEUERUNG
+  // ------------------------------------------
+
+  void _updateAirControl() {
+    if (_throttle == 0) {
+      return;
+    }
+
+    if (!_isVehicleAirborne()) {
+      return;
+    }
+
+    final double angularVelocity = vehicle.body.angularVelocity;
+
+    // ------------------------------------------
+    // GAS
+    //
+    // Nase nach oben / Fahrzeug nach hinten drehen.
+    // ------------------------------------------
+
+    if (_throttle > 0) {
+      if (angularVelocity <= -_maxAirAngularVelocity) {
+        return;
+      }
+
+      vehicle.body.applyTorque(-_airControlTorque);
+
+      return;
+    }
+
+    // ------------------------------------------
+    // RÜCKWÄRTS / BREMSE
+    //
+    // Nase nach unten / Fahrzeug nach vorne drehen.
+    // ------------------------------------------
+
+    if (_throttle < 0) {
+      if (angularVelocity >= _maxAirAngularVelocity) {
+        return;
+      }
+
+      vehicle.body.applyTorque(_airControlTorque);
+    }
+  }
+
+  bool _isVehicleAirborne() {
+    final Vector2 rearPosition = rearWheel.body.position;
+    final Vector2 frontPosition = frontWheel.body.position;
+
+    final double rearGroundY = PhysicsTerrain.getTerrainY(rearPosition.x);
+    final double frontGroundY = PhysicsTerrain.getTerrainY(frontPosition.x);
+
+    final double rearWheelBottom = rearPosition.y + rearWheel.radius;
+    final double frontWheelBottom = frontPosition.y + frontWheel.radius;
+
+    final double rearClearance = rearGroundY - rearWheelBottom;
+    final double frontClearance = frontGroundY - frontWheelBottom;
+
+    return rearClearance > _airborneGroundClearance &&
+        frontClearance > _airborneGroundClearance;
+  }
+
+  // ------------------------------------------
   // ABHOLSTATION
   // ------------------------------------------
 
@@ -238,16 +332,11 @@ class PhysicsTestGame extends Forge2DGame {
 
     _pickupStationReached = true;
 
-    // Pedal und Motor sofort neutralisieren.
     _throttle = 0;
     rearWheelJoint.motorSpeed = 0;
 
-    // Flutter darüber informieren, damit das
-    // Abholfenster angezeigt wird.
     onPickupStationReached?.call();
 
-    // Während des Abholvorgangs wird die komplette
-    // Flame-/Forge2D-Spielwelt pausiert.
     pauseEngine();
   }
 
@@ -256,25 +345,16 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    // Ladung wurde übernommen.
     _cargoPickedUp = true;
-
-    // Der Abholvorgang ist beendet.
     _pickupStationReached = false;
 
-    // Nach dem Overlay starten wir mit neutralem
-    // Pedalzustand.
     _throttle = 0;
     rearWheelJoint.motorSpeed = 0;
 
-    // Ladung auf dem Pickup anzeigen.
     vehicle.showCargo();
 
-    // Flutter darüber informieren, damit das
-    // Abholfenster geschlossen wird.
     onCargoPickedUp?.call();
 
-    // Flame und Forge2D wieder starten.
     resumeEngine();
   }
 
@@ -363,8 +443,6 @@ class PhysicsTestGame extends Forge2DGame {
   // ------------------------------------------
 
   void setThrottle(double value) {
-    // Während der Abholung darf keine Eingabe
-    // gespeichert werden.
     if (_pickupStationReached && !_cargoPickedUp) {
       _throttle = 0;
 
@@ -446,7 +524,17 @@ abstract class DeliveryDestination extends PositionComponent {
   }
 
   void drawDeliveryZone(Canvas canvas) {
-    const Rect zone = Rect.fromLTWH(-5.6, -0.18, 4.0, 0.30);
+    // Gebäude: x = 292
+    //
+    // Sichtbare Zone relativ zum Gebäude:
+    // -5 bis -1
+    //
+    // Absolut:
+    // x = 287 bis x = 291
+    //
+    // Das stimmt exakt mit dem
+    // physikalischen Trigger überein.
+    const Rect zone = Rect.fromLTWH(-5.0, -0.18, 4.0, 0.30);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(zone, const Radius.circular(0.12)),
@@ -767,7 +855,7 @@ class PhysicsLandscape extends PositionComponent {
 
   void _drawFarMountains(Canvas canvas) {
     final Path path = Path()
-      ..moveTo(-40, 9)
+      ..moveTo(-40, 10)
       ..lineTo(-40, 4.5)
       ..lineTo(-28, 0.8)
       ..lineTo(-20, 3.0)
@@ -784,10 +872,20 @@ class PhysicsLandscape extends PositionComponent {
       ..lineTo(112, 0.4)
       ..lineTo(126, 3.1)
       ..lineTo(140, -0.7)
-      ..lineTo(158, 3.2)
-      ..lineTo(175, 0.3)
-      ..lineTo(190, 4.0)
-      ..lineTo(190, 9)
+      ..lineTo(154, 3.0)
+      ..lineTo(168, 0.1)
+      ..lineTo(182, 3.3)
+      ..lineTo(196, -0.9)
+      ..lineTo(210, 3.0)
+      ..lineTo(224, 0.4)
+      ..lineTo(238, 3.2)
+      ..lineTo(252, -0.6)
+      ..lineTo(266, 3.1)
+      ..lineTo(280, 0.2)
+      ..lineTo(294, 3.4)
+      ..lineTo(310, -0.5)
+      ..lineTo(325, 3.5)
+      ..lineTo(325, 10)
       ..close();
 
     canvas.drawPath(path, _farMountainPaint);
@@ -795,7 +893,7 @@ class PhysicsLandscape extends PositionComponent {
 
   void _drawMiddleMountains(Canvas canvas) {
     final Path path = Path()
-      ..moveTo(-40, 9)
+      ..moveTo(-40, 10)
       ..lineTo(-40, 5.5)
       ..quadraticBezierTo(-30, 2.2, -20, 5.2)
       ..quadraticBezierTo(-8, 1.6, 4, 5.0)
@@ -804,9 +902,14 @@ class PhysicsLandscape extends PositionComponent {
       ..quadraticBezierTo(68, 2.4, 82, 5.4)
       ..quadraticBezierTo(96, 1.5, 110, 5.0)
       ..quadraticBezierTo(124, 2.0, 138, 5.3)
-      ..quadraticBezierTo(153, 1.8, 168, 5.1)
-      ..quadraticBezierTo(180, 2.8, 190, 5.5)
-      ..lineTo(190, 9)
+      ..quadraticBezierTo(152, 1.6, 166, 5.2)
+      ..quadraticBezierTo(180, 2.4, 194, 5.4)
+      ..quadraticBezierTo(208, 1.4, 222, 5.1)
+      ..quadraticBezierTo(236, 2.2, 250, 5.3)
+      ..quadraticBezierTo(264, 1.7, 278, 5.2)
+      ..quadraticBezierTo(292, 2.3, 306, 5.4)
+      ..quadraticBezierTo(316, 3.0, 325, 5.6)
+      ..lineTo(325, 10)
       ..close();
 
     canvas.drawPath(path, _middleMountainPaint);
@@ -814,7 +917,7 @@ class PhysicsLandscape extends PositionComponent {
 
   void _drawHills(Canvas canvas) {
     final Path path = Path()
-      ..moveTo(-40, 10)
+      ..moveTo(-40, 11)
       ..lineTo(-40, 6.5)
       ..quadraticBezierTo(-25, 4.7, -10, 6.6)
       ..quadraticBezierTo(5, 4.8, 20, 6.4)
@@ -822,16 +925,20 @@ class PhysicsLandscape extends PositionComponent {
       ..quadraticBezierTo(65, 4.7, 80, 6.5)
       ..quadraticBezierTo(95, 4.4, 110, 6.4)
       ..quadraticBezierTo(125, 4.7, 140, 6.6)
-      ..quadraticBezierTo(155, 4.5, 170, 6.4)
-      ..quadraticBezierTo(182, 5.0, 190, 6.5)
-      ..lineTo(190, 10)
+      ..quadraticBezierTo(155, 4.4, 170, 6.5)
+      ..quadraticBezierTo(185, 4.7, 200, 6.4)
+      ..quadraticBezierTo(215, 4.3, 230, 6.6)
+      ..quadraticBezierTo(245, 4.8, 260, 6.4)
+      ..quadraticBezierTo(275, 4.5, 290, 6.6)
+      ..quadraticBezierTo(305, 4.7, 325, 6.5)
+      ..lineTo(325, 11)
       ..close();
 
     canvas.drawPath(path, _hillPaint);
   }
 
   void _drawForest(Canvas canvas) {
-    for (double x = -35; x < 190; x += 3.4) {
+    for (double x = -35; x < 325; x += 3.4) {
       final int index = ((x + 35) / 3.4).round();
 
       final double variation = (index % 4) * 0.18;
@@ -880,47 +987,199 @@ class PhysicsTerrain extends BodyComponent {
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round;
 
-  static final List<Vector2> _points = [
-    Vector2(-10, 8),
-    Vector2(0, 8),
-    Vector2(8, 8),
-    Vector2(13, 7.8),
-    Vector2(17, 7.3),
-    Vector2(21, 7.6),
-    Vector2(25, 8.0),
-    Vector2(30, 7.5),
-    Vector2(35, 6.4),
-    Vector2(40, 5.8),
-    Vector2(45, 6.5),
-    Vector2(50, 7.5),
-    Vector2(55, 8.2),
-    Vector2(60, 8.8),
-    Vector2(65, 8.4),
-    Vector2(70, 7.6),
-    Vector2(74, 6.9),
-    Vector2(78, 7.7),
-    Vector2(82, 6.8),
-    Vector2(86, 7.8),
-    Vector2(92, 7.2),
-    Vector2(98, 6.2),
-    Vector2(104, 5.2),
-    Vector2(110, 4.7),
-    Vector2(116, 5.3),
+  static final List<Vector2> _controlPoints = [
+    // START / DEPOT
+    Vector2(-10, 8.0),
+    Vector2(0, 8.0),
+    Vector2(8, 8.0),
+    Vector2(13, 7.9),
+    Vector2(18, 7.5),
+    Vector2(23, 7.9),
+    Vector2(28, 8.1),
 
-    // Übergang zum Zielbereich
-    Vector2(122, 6.5),
-    Vector2(128, 7.5),
-    Vector2(132, 8.0),
+    // NATÜRLICHER EINSTIEG
+    Vector2(34, 7.7),
+    Vector2(40, 6.9),
+    Vector2(46, 6.2),
+    Vector2(52, 6.5),
+    Vector2(58, 7.4),
+    Vector2(64, 8.1),
 
-    // ------------------------------------------
-    // EBENE ABGABESTATION
-    // ------------------------------------------
-    Vector2(136, 8.0),
-    Vector2(140, 8.0),
-    Vector2(144, 8.0),
-    Vector2(148, 8.0),
-    Vector2(155, 8.0),
+    // SPRUNG 1
+    Vector2(68, 7.7),
+    Vector2(71, 6.8),
+    Vector2(74, 5.7),
+    Vector2(77, 5.0),
+    Vector2(79, 4.8),
+    Vector2(81, 5.0),
+    Vector2(84, 6.2),
+    Vector2(88, 7.8),
+    Vector2(92, 8.7),
+
+    // LANGES TAL
+    Vector2(98, 9.1),
+    Vector2(104, 8.8),
+    Vector2(110, 7.9),
+    Vector2(116, 6.8),
+    Vector2(122, 5.8),
+
+    // SPRUNG 2
+    Vector2(128, 4.9),
+    Vector2(133, 4.2),
+    Vector2(137, 3.9),
+    Vector2(140, 3.8),
+    Vector2(142, 4.0),
+    Vector2(145, 5.2),
+    Vector2(148, 6.8),
+    Vector2(152, 8.5),
+    Vector2(157, 9.6),
+
+    // ERHOLUNGSABSCHNITT
+    Vector2(162, 9.8),
+    Vector2(167, 9.1),
+    Vector2(172, 8.1),
+
+    // SPRUNG 3 / TECHNISCHER BEREICH
+    Vector2(176, 7.0),
+    Vector2(179, 5.8),
+    Vector2(182, 5.0),
+    Vector2(184, 4.8),
+    Vector2(186, 5.2),
+    Vector2(189, 6.8),
+    Vector2(192, 8.1),
+    Vector2(195, 7.2),
+    Vector2(198, 5.9),
+    Vector2(201, 5.3),
+    Vector2(203, 5.5),
+    Vector2(206, 6.8),
+    Vector2(210, 8.6),
+    Vector2(215, 9.4),
+
+    // KLEINE OFFROAD-WELLEN
+    Vector2(220, 8.8),
+    Vector2(224, 7.6),
+    Vector2(228, 8.2),
+    Vector2(232, 7.4),
+
+    // SPRUNG 4
+    Vector2(236, 6.4),
+    Vector2(240, 5.1),
+    Vector2(244, 3.9),
+    Vector2(248, 3.1),
+    Vector2(251, 2.8),
+    Vector2(253, 2.8),
+    Vector2(255, 3.1),
+    Vector2(257, 4.2),
+    Vector2(260, 5.9),
+    Vector2(264, 7.8),
+    Vector2(268, 9.2),
+
+    // SANFTER AUSLAUF
+    Vector2(272, 9.2),
+    Vector2(274, 8.7),
+    Vector2(276, 8.3),
+
+    // KOMPLETT EBENER ZIELBEREICH
+    Vector2(278, 8.0),
+    Vector2(280, 8.0),
+    Vector2(284, 8.0),
+    Vector2(288, 8.0),
+    Vector2(292, 8.0),
+    Vector2(296, 8.0),
+    Vector2(300, 8.0),
+    Vector2(304, 8.0),
+    Vector2(308, 8.0),
+    Vector2(312, 8.0),
+    Vector2(316, 8.0),
   ];
+
+  static const int _segmentsPerSection = 5;
+
+  static final List<Vector2> _points = _buildSmoothTerrain();
+
+  static List<Vector2> _buildSmoothTerrain() {
+    final List<Vector2> result = <Vector2>[];
+
+    if (_controlPoints.length < 2) {
+      return List<Vector2>.from(_controlPoints);
+    }
+
+    result.add(Vector2(_controlPoints.first.x, _controlPoints.first.y));
+
+    for (int i = 0; i < _controlPoints.length - 1; i++) {
+      final Vector2 p0 = i == 0 ? _controlPoints[i] : _controlPoints[i - 1];
+
+      final Vector2 p1 = _controlPoints[i];
+
+      final Vector2 p2 = _controlPoints[i + 1];
+
+      final Vector2 p3 = i + 2 < _controlPoints.length
+          ? _controlPoints[i + 2]
+          : _controlPoints[i + 1];
+
+      for (int step = 1; step <= _segmentsPerSection; step++) {
+        final double t = step / _segmentsPerSection;
+
+        final double x = _catmullRom(p0.x, p1.x, p2.x, p3.x, t);
+
+        final double y = _catmullRom(p0.y, p1.y, p2.y, p3.y, t);
+
+        result.add(Vector2(x, y));
+      }
+    }
+
+    return result;
+  }
+
+  static double _catmullRom(
+    double p0,
+    double p1,
+    double p2,
+    double p3,
+    double t,
+  ) {
+    final double t2 = t * t;
+    final double t3 = t2 * t;
+
+    return 0.5 *
+        ((2.0 * p1) +
+            (-p0 + p2) * t +
+            (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 +
+            (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3);
+  }
+
+  static double getTerrainY(double x) {
+    if (_points.isEmpty) {
+      return 8.0;
+    }
+
+    if (x <= _points.first.x) {
+      return _points.first.y;
+    }
+
+    if (x >= _points.last.x) {
+      return _points.last.y;
+    }
+
+    for (int i = 0; i < _points.length - 1; i++) {
+      final Vector2 start = _points[i];
+      final Vector2 end = _points[i + 1];
+
+      if (x >= start.x && x <= end.x) {
+        final double width = end.x - start.x;
+
+        if (width.abs() < 0.0001) {
+          return start.y;
+        }
+
+        final double progress = (x - start.x) / width;
+
+        return start.y + ((end.y - start.y) * progress);
+      }
+    }
+
+    return _points.last.y;
+  }
 
   @override
   Body createBody() {
@@ -932,7 +1191,7 @@ class PhysicsTerrain extends BodyComponent {
     final Body terrainBody = world.createBody(bodyDef);
 
     final List<Vector2> collisionPoints = _points
-        .map((point) => Vector2(point.x, point.y))
+        .map((Vector2 point) => Vector2(point.x, point.y))
         .toList();
 
     terrainBody.createChain(ChainDef(points: collisionPoints, isLoop: false));

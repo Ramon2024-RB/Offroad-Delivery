@@ -136,7 +136,9 @@ class _MissionSelectionPageState extends State<MissionSelectionPage> {
             },
             icon: const Icon(Icons.arrow_back_rounded),
           ),
+
           const SizedBox(width: 14),
+
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,16 +158,21 @@ class _MissionSelectionPageState extends State<MissionSelectionPage> {
               ],
             ),
           ),
+
           _HeaderValue(
             icon: Icons.shield_rounded,
             text: 'LVL ${progressController.level}',
           ),
+
           const SizedBox(width: 8),
+
           _HeaderValue(
             icon: Icons.monetization_on_rounded,
             text: '${progressController.money}',
           ),
+
           const SizedBox(width: 8),
+
           _HeaderValue(
             icon: Icons.star_rounded,
             text: '${progressController.xp} XP',
@@ -374,7 +381,13 @@ class _MissionCard extends StatelessWidget {
                 _MissionRecordDisplay(
                   record: record,
                   recordsLoaded: recordsLoaded,
-                  maxStars: mission.timeRatingRule?.maxStars ?? 3,
+
+                  // WICHTIG:
+                  // Nicht mehr nur die
+                  // Zeitsterne verwenden.
+                  // Dadurch können Missionen
+                  // jetzt z.B. 5 Sterne haben.
+                  maxStars: mission.maxStars,
                 ),
               ],
             ),
@@ -557,7 +570,8 @@ class _MissionRecordDisplay extends StatelessWidget {
 
     final int remainingSeconds = totalSeconds % 60;
 
-    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+    return '$minutes:'
+        '${remainingSeconds.toString().padLeft(2, '0')}';
   }
 }
 

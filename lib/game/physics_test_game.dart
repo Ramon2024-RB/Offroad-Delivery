@@ -5,24 +5,34 @@ import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
 
 import '../missions/delivery_mission.dart';
+import '../routes/route_catalog.dart';
+import '../routes/route_definition.dart';
 import 'components/physics_vehicle.dart';
 import 'components/physics_wheel.dart';
 
 class PhysicsTestGame extends Forge2DGame {
   PhysicsTestGame({
     required this.mission,
+    RouteDefinition? route,
     this.onPickupStationReached,
     this.onCargoPickedUp,
     this.onCargoConditionChanged,
     this.onDeliveryCompleted,
     this.onMissionFailed,
-  }) : super(
+  }) : route = route ?? RouteCatalog.route1,
+       super(
          gravity: Vector2(0, 9.81),
          metersToPixels: 32,
          camera: CameraComponent.withFixedResolution(width: 900, height: 400),
        );
 
   final DeliveryMission mission;
+
+  /// Individuell gestaltete Route, die für diese Mission gefahren wird.
+  ///
+  /// Solange eine Mission noch keine eigene Route auswählt,
+  /// verwenden wir Route 1 als Standard.
+  final RouteDefinition route;
 
   final VoidCallback? onPickupStationReached;
   final VoidCallback? onCargoPickedUp;
@@ -31,8 +41,6 @@ class PhysicsTestGame extends Forge2DGame {
 
   final void Function(int moneyReward, int xpReward)? onDeliveryCompleted;
 
-  // Wird ausgelöst, wenn das Fahrzeug nach einem
-  // Überschlag nicht mehr fahrbereit ist.
   final VoidCallback? onMissionFailed;
 
   late final PhysicsVehicle vehicle;
@@ -42,15 +50,13 @@ class PhysicsTestGame extends Forge2DGame {
   late final WheelJoint rearWheelJoint;
   late final WheelJoint frontWheelJoint;
 
+  late final PhysicsTerrain terrain;
+
   bool _pickupStationReached = false;
   bool _cargoPickedUp = false;
   bool _deliveryCompleted = false;
-
-  // Verhindert weitere Missionsaktionen,
-  // sobald der Auftrag fehlgeschlagen ist.
   bool _missionFailed = false;
 
-  // Wird von GamePage für die Ladungsanzeige verwendet.
   bool get cargoPickedUp => _cargoPickedUp;
 
   double _throttle = 0;
@@ -65,22 +71,12 @@ class PhysicsTestGame extends Forge2DGame {
 
   double _maximumAirborneDownwardSpeed = 0.0;
 
-  // Verhindert, dass winzige Bodenwellen als
-  // echte Sprünge erkannt werden.
   double _airborneTime = 0.0;
 
   static const double _minimumAirborneTimeForLanding = 0.18;
 
-  // Abstand zwischen Reifenunterkante und Terrain,
-  // ab dem ein Rad als nicht mehr auf dem Boden gilt.
   static const double _airborneGroundClearance = 0.12;
 
-  // Landungsschwellen.
-  //
-  // Unter 4.5 m/s = normale Landung
-  // 4.5–6.0 m/s   = leichte harte Landung
-  // 6.0–8.0 m/s   = harte Landung
-  // über 8.0 m/s   = sehr harte Landung
   static const double _lightLandingSpeed = 4.5;
   static const double _hardLandingSpeed = 6.0;
   static const double _extremeLandingSpeed = 8.0;
@@ -89,19 +85,10 @@ class PhysicsTestGame extends Forge2DGame {
   // ÜBERSCHLAG / MISSIONSFEHLSCHLAG
   // ------------------------------------------
 
-  // Ab dieser Schräglage kann das Fahrzeug als
-  // umgekippt bzw. auf dem Dach liegend gelten.
   static const double _rolloverAngleDegrees = 70.0;
 
-  // Das Fahrzeug muss zusätzlich langsam sein.
-  //
-  // Dadurch löst ein schneller Überschlag oder
-  // eine noch laufende Rettungsbewegung nicht
-  // sofort den Festliege-Timer aus.
   static const double _rolloverMaximumLinearSpeed = 1.5;
 
-  // Erst nach 2,5 Sekunden in einem wirklich
-  // festliegenden Zustand schlägt die Mission fehl.
   static const double _rolloverFailureTime = 2.5;
 
   double _rolloverStuckTime = 0.0;
@@ -121,30 +108,12 @@ class PhysicsTestGame extends Forge2DGame {
   static const double _frontWheelX = 1.45;
   static const double _wheelY = 1.0;
 
-  static const double _pickupX = 18.0;
-
   // ------------------------------------------
   // LUFTSTEUERUNG
   // ------------------------------------------
 
   static const double _airControlTorque = 32.0;
   static const double _maxAirAngularVelocity = 3.4;
-
-  // ------------------------------------------
-  // ZIELBEREICH
-  // ------------------------------------------
-
-  static const double _deliveryDestinationX = 292.0;
-  static const double _deliveryGroundY = 8.0;
-
-  // Gebäude: x = 292
-  //
-  // Lieferzone:
-  // x = 287 bis x = 291
-  static const double _deliveryZoneCenterX = 289.0;
-  static const double _deliveryZoneHalfWidth = 2.0;
-
-  static const double _deliveryMaxSpeed = 1.0;
 
   @override
   Color backgroundColor() {
@@ -156,22 +125,35 @@ class PhysicsTestGame extends Forge2DGame {
     await super.onLoad();
 
     final PhysicsLandscape landscape = PhysicsLandscape();
-    final PhysicsTerrain terrain = PhysicsTerrain();
+
+    terrain = PhysicsTerrain(controlPoints: route.terrainControlPoints);
+
+    final double pickupGroundY = terrain.getTerrainY(route.pickupX);
 
     final PickupStation pickupStation = PickupStation(
-      position: Vector2(_pickupX, 7.0),
+      position: Vector2(route.pickupX, pickupGroundY),
     );
 
     final PositionComponent deliveryDestination = _createDeliveryDestination();
 
-    vehicle = PhysicsVehicle(startPosition: Vector2(8, 5));
+    final Vector2 startPosition = route.vehicleStartPosition;
+
+    vehicle = PhysicsVehicle(
+      startPosition: Vector2(startPosition.x, startPosition.y),
+    );
 
     rearWheel = PhysicsWheel(
-      startPosition: Vector2(8 + _rearWheelX, 5 + _wheelY),
+      startPosition: Vector2(
+        startPosition.x + _rearWheelX,
+        startPosition.y + _wheelY,
+      ),
     );
 
     frontWheel = PhysicsWheel(
-      startPosition: Vector2(8 + _frontWheelX, 5 + _wheelY),
+      startPosition: Vector2(
+        startPosition.x + _frontWheelX,
+        startPosition.y + _wheelY,
+      ),
     );
 
     await world.add(landscape);
@@ -184,11 +166,17 @@ class PhysicsTestGame extends Forge2DGame {
 
     _createSuspension();
 
-    camera.viewfinder.position = Vector2(12, 6);
+    camera.viewfinder.position = Vector2(
+      startPosition.x + 4,
+      startPosition.y + 1,
+    );
   }
 
   PositionComponent _createDeliveryDestination() {
-    final Vector2 position = Vector2(_deliveryDestinationX, _deliveryGroundY);
+    final Vector2 position = Vector2(
+      route.deliveryDestinationX,
+      route.deliveryGroundY,
+    );
 
     switch (mission.destinationType) {
       case DestinationType.house:
@@ -218,9 +206,6 @@ class PhysicsTestGame extends Forge2DGame {
 
     camera.viewfinder.position = Vector2(vehicleX + 5, vehicleY + 0.5);
 
-    // Nach einem Missionsfehlschlag bleibt die Kamera
-    // noch beim Fahrzeug, aber sämtliche Missions- und
-    // Fahrlogik wird beendet.
     if (_missionFailed) {
       return;
     }
@@ -329,8 +314,6 @@ class PhysicsTestGame extends Forge2DGame {
 
     final double angularVelocity = vehicle.body.angularVelocity;
 
-    // GAS:
-    // Nase nach oben.
     if (_throttle > 0) {
       if (angularVelocity <= -_maxAirAngularVelocity) {
         return;
@@ -341,8 +324,6 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    // RÜCKWÄRTS / BREMSE:
-    // Nase nach unten.
     if (_throttle < 0) {
       if (angularVelocity >= _maxAirAngularVelocity) {
         return;
@@ -357,9 +338,9 @@ class PhysicsTestGame extends Forge2DGame {
 
     final Vector2 frontPosition = frontWheel.body.position;
 
-    final double rearGroundY = PhysicsTerrain.getTerrainY(rearPosition.x);
+    final double rearGroundY = terrain.getTerrainY(rearPosition.x);
 
-    final double frontGroundY = PhysicsTerrain.getTerrainY(frontPosition.x);
+    final double frontGroundY = terrain.getTerrainY(frontPosition.x);
 
     final double rearWheelBottom = rearPosition.y + rearWheel.radius;
 
@@ -432,13 +413,6 @@ class PhysicsTestGame extends Forge2DGame {
     } else if (impactSpeed < _extremeLandingSpeed) {
       baseDamage = 8.0;
     } else {
-      // Je stärker der Aufprall über 8 m/s,
-      // desto größer der Schaden.
-      //
-      // Beispiel:
-      // 8 m/s  ≈ 15 %
-      // 10 m/s ≈ 21 %
-      // 12 m/s ≈ 27 %
       baseDamage = 15.0 + ((impactSpeed - _extremeLandingSpeed) * 3.0);
     }
 
@@ -526,11 +500,6 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    // Während eines Sprungs darf der Timer nicht laufen.
-    //
-    // Dadurch kann der Spieler das Fahrzeug mit der
-    // Luftsteuerung drehen, ohne dass dies bereits als
-    // festliegender Überschlag gewertet wird.
     if (_isVehicleAirborne()) {
       _rolloverStuckTime = 0;
 
@@ -551,9 +520,6 @@ class PhysicsTestGame extends Forge2DGame {
 
     final double linearSpeed = velocity.length;
 
-    // Solange das Fahrzeug noch deutlich in Bewegung
-    // ist, geben wir dem Spieler Zeit, die Situation
-    // selbst zu retten.
     if (linearSpeed > _rolloverMaximumLinearSpeed) {
       _rolloverStuckTime = 0;
 
@@ -572,7 +538,6 @@ class PhysicsTestGame extends Forge2DGame {
   double _vehicleTiltDegrees() {
     double angle = vehicle.body.angle;
 
-    // Winkel in den Bereich -PI bis +PI bringen.
     while (angle > math.pi) {
       angle -= math.pi * 2;
     }
@@ -583,9 +548,6 @@ class PhysicsTestGame extends Forge2DGame {
 
     final double absoluteAngle = angle.abs();
 
-    // 0°   = normal auf den Rädern
-    // 90°  = auf der Seite
-    // 180° = auf dem Dach
     return absoluteAngle * 180 / math.pi;
   }
 
@@ -602,9 +564,6 @@ class PhysicsTestGame extends Forge2DGame {
 
     rearWheelJoint.motorSpeed = 0;
 
-    // Das Fahrzeug darf physikalisch liegen bleiben.
-    // Wir stoppen lediglich den Antrieb und sämtliche
-    // Missionslogik.
     onMissionFailed?.call();
   }
 
@@ -622,7 +581,7 @@ class PhysicsTestGame extends Forge2DGame {
     }
 
     final bool insidePickupZone =
-        vehicleX >= _pickupX - 1.5 && vehicleX <= _pickupX + 1.5;
+        vehicleX >= route.pickupZoneStartX && vehicleX <= route.pickupZoneEndX;
 
     if (!insidePickupZone) {
       return;
@@ -688,8 +647,8 @@ class PhysicsTestGame extends Forge2DGame {
     }
 
     final bool insideDeliveryZone =
-        vehicleX >= _deliveryZoneCenterX - _deliveryZoneHalfWidth &&
-        vehicleX <= _deliveryZoneCenterX + _deliveryZoneHalfWidth;
+        vehicleX >= route.deliveryZoneStartX &&
+        vehicleX <= route.deliveryZoneEndX;
 
     if (!insideDeliveryZone) {
       return;
@@ -697,7 +656,7 @@ class PhysicsTestGame extends Forge2DGame {
 
     final double speed = vehicle.body.linearVelocity.x.abs();
 
-    if (speed > _deliveryMaxSpeed) {
+    if (speed > route.deliveryMaxSpeed) {
       return;
     }
 
@@ -1296,7 +1255,13 @@ class PhysicsLandscape extends PositionComponent {
 // ----------------------------------------------------
 
 class PhysicsTerrain extends BodyComponent {
-  PhysicsTerrain() : super(renderBody: false);
+  PhysicsTerrain({required List<Vector2> controlPoints})
+    : _controlPoints = controlPoints
+          .map((Vector2 point) => Vector2(point.x, point.y))
+          .toList(),
+      super(renderBody: false) {
+    _points = _buildSmoothTerrain();
+  }
 
   final Paint _groundPaint = Paint()..color = const Color(0xFF506F38);
 
@@ -1307,106 +1272,13 @@ class PhysicsTerrain extends BodyComponent {
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round;
 
-  static final List<Vector2> _controlPoints = [
-    Vector2(-10, 8.0),
-    Vector2(0, 8.0),
-    Vector2(8, 8.0),
-    Vector2(13, 7.9),
-    Vector2(18, 7.5),
-    Vector2(23, 7.9),
-    Vector2(28, 8.1),
+  final List<Vector2> _controlPoints;
 
-    Vector2(34, 7.7),
-    Vector2(40, 6.9),
-    Vector2(46, 6.2),
-    Vector2(52, 6.5),
-    Vector2(58, 7.4),
-    Vector2(64, 8.1),
-
-    Vector2(68, 7.7),
-    Vector2(71, 6.8),
-    Vector2(74, 5.7),
-    Vector2(77, 5.0),
-    Vector2(79, 4.8),
-    Vector2(81, 5.0),
-    Vector2(84, 6.2),
-    Vector2(88, 7.8),
-    Vector2(92, 8.7),
-
-    Vector2(98, 9.1),
-    Vector2(104, 8.8),
-    Vector2(110, 7.9),
-    Vector2(116, 6.8),
-    Vector2(122, 5.8),
-
-    Vector2(128, 4.9),
-    Vector2(133, 4.2),
-    Vector2(137, 3.9),
-    Vector2(140, 3.8),
-    Vector2(142, 4.0),
-    Vector2(145, 5.2),
-    Vector2(148, 6.8),
-    Vector2(152, 8.5),
-    Vector2(157, 9.6),
-
-    Vector2(162, 9.8),
-    Vector2(167, 9.1),
-    Vector2(172, 8.1),
-
-    Vector2(176, 7.0),
-    Vector2(179, 5.8),
-    Vector2(182, 5.0),
-    Vector2(184, 4.8),
-    Vector2(186, 5.2),
-    Vector2(189, 6.8),
-    Vector2(192, 8.1),
-    Vector2(195, 7.2),
-    Vector2(198, 5.9),
-    Vector2(201, 5.3),
-    Vector2(203, 5.5),
-    Vector2(206, 6.8),
-    Vector2(210, 8.6),
-    Vector2(215, 9.4),
-
-    Vector2(220, 8.8),
-    Vector2(224, 7.6),
-    Vector2(228, 8.2),
-    Vector2(232, 7.4),
-
-    Vector2(236, 6.4),
-    Vector2(240, 5.1),
-    Vector2(244, 3.9),
-    Vector2(248, 3.1),
-    Vector2(251, 2.8),
-    Vector2(253, 2.8),
-    Vector2(255, 3.1),
-    Vector2(257, 4.2),
-    Vector2(260, 5.9),
-    Vector2(264, 7.8),
-    Vector2(268, 9.2),
-
-    Vector2(272, 9.2),
-    Vector2(274, 8.7),
-    Vector2(276, 8.3),
-
-    Vector2(278, 8.0),
-    Vector2(280, 8.0),
-    Vector2(284, 8.0),
-    Vector2(288, 8.0),
-    Vector2(292, 8.0),
-    Vector2(296, 8.0),
-    Vector2(300, 8.0),
-    Vector2(304, 8.0),
-    Vector2(308, 8.0),
-    Vector2(312, 8.0),
-    Vector2(316, 8.0),
-  ];
+  late final List<Vector2> _points;
 
   static const int _segmentsPerSection = 5;
 
-  static final List<Vector2> _points = _buildSmoothTerrain();
-
-  static List<Vector2> _buildSmoothTerrain() {
+  List<Vector2> _buildSmoothTerrain() {
     final List<Vector2> result = <Vector2>[];
 
     if (_controlPoints.length < 2) {
@@ -1440,13 +1312,7 @@ class PhysicsTerrain extends BodyComponent {
     return result;
   }
 
-  static double _catmullRom(
-    double p0,
-    double p1,
-    double p2,
-    double p3,
-    double t,
-  ) {
+  double _catmullRom(double p0, double p1, double p2, double p3, double t) {
     final double t2 = t * t;
     final double t3 = t2 * t;
 
@@ -1457,7 +1323,7 @@ class PhysicsTerrain extends BodyComponent {
             (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3);
   }
 
-  static double getTerrainY(double x) {
+  double getTerrainY(double x) {
     if (_points.isEmpty) {
       return 8.0;
     }
@@ -1512,6 +1378,10 @@ class PhysicsTerrain extends BodyComponent {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
+
+    if (_points.isEmpty) {
+      return;
+    }
 
     final Path groundPath = Path()..moveTo(_points.first.x, _points.first.y);
 

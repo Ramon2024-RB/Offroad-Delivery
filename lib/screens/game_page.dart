@@ -8,6 +8,8 @@ import '../game/physics_test_game.dart';
 import '../missions/delivery_mission.dart';
 import '../progress/mission_record.dart';
 import '../progress/player_progress_controller.dart';
+import '../routes/route_catalog.dart';
+import '../routes/route_definition.dart';
 
 class GamePage extends StatefulWidget {
   const GamePage({
@@ -99,8 +101,14 @@ class _GamePageState extends State<GamePage> {
 
     widget.progressController.addListener(_onProgressChanged);
 
+    // Die Mission bestimmt über ihre routeId,
+    // auf welcher individuell entworfenen Route sie stattfindet.
+    final RouteDefinition route =
+        RouteCatalog.findById(widget.mission.routeId) ?? RouteCatalog.route1;
+
     _game = PhysicsTestGame(
       mission: widget.mission,
+      route: route,
 
       // ------------------------------------------
       // ABHOLSTATION ERREICHT

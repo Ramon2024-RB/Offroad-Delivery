@@ -135,6 +135,7 @@ class DeliveryMission {
     required this.id,
     required this.title,
     required this.description,
+    required this.routeId,
     required this.cargoType,
     required this.destinationType,
     required this.difficulty,
@@ -155,6 +156,21 @@ class DeliveryMission {
 
   final String title;
   final String description;
+
+  // --------------------------------------------------
+  // ROUTE
+  // --------------------------------------------------
+
+  /// Eindeutige ID der Route, auf der diese Mission stattfindet.
+  ///
+  /// Die ID verweist auf eine Route aus dem RouteCatalog.
+  ///
+  /// Dadurch können Missionen später gezielt auf vollständig
+  /// individuell entworfenen Strecken stattfinden.
+  ///
+  /// Beispiel:
+  /// route_01
+  final String routeId;
 
   final CargoType cargoType;
   final DestinationType destinationType;

@@ -15,6 +15,7 @@ class PhysicsTestGame extends Forge2DGame {
     this.onCargoPickedUp,
     this.onCargoConditionChanged,
     this.onDeliveryCompleted,
+    this.onMissionFailed,
   }) : super(
          gravity: Vector2(0, 9.81),
          metersToPixels: 32,
@@ -30,6 +31,10 @@ class PhysicsTestGame extends Forge2DGame {
 
   final void Function(int moneyReward, int xpReward)? onDeliveryCompleted;
 
+  // Wird ausgelöst, wenn das Fahrzeug nach einem
+  // Überschlag nicht mehr fahrbereit ist.
+  final VoidCallback? onMissionFailed;
+
   late final PhysicsVehicle vehicle;
   late final PhysicsWheel rearWheel;
   late final PhysicsWheel frontWheel;
@@ -40,6 +45,10 @@ class PhysicsTestGame extends Forge2DGame {
   bool _pickupStationReached = false;
   bool _cargoPickedUp = false;
   bool _deliveryCompleted = false;
+
+  // Verhindert weitere Missionsaktionen,
+  // sobald der Auftrag fehlgeschlagen ist.
+  bool _missionFailed = false;
 
   // Wird von GamePage für die Ladungsanzeige verwendet.
   bool get cargoPickedUp => _cargoPickedUp;
@@ -75,6 +84,27 @@ class PhysicsTestGame extends Forge2DGame {
   static const double _lightLandingSpeed = 4.5;
   static const double _hardLandingSpeed = 6.0;
   static const double _extremeLandingSpeed = 8.0;
+
+  // ------------------------------------------
+  // ÜBERSCHLAG / MISSIONSFEHLSCHLAG
+  // ------------------------------------------
+
+  // Ab dieser Schräglage kann das Fahrzeug als
+  // umgekippt bzw. auf dem Dach liegend gelten.
+  static const double _rolloverAngleDegrees = 70.0;
+
+  // Das Fahrzeug muss zusätzlich langsam sein.
+  //
+  // Dadurch löst ein schneller Überschlag oder
+  // eine noch laufende Rettungsbewegung nicht
+  // sofort den Festliege-Timer aus.
+  static const double _rolloverMaximumLinearSpeed = 1.5;
+
+  // Erst nach 2,5 Sekunden in einem wirklich
+  // festliegenden Zustand schlägt die Mission fehl.
+  static const double _rolloverFailureTime = 2.5;
+
+  double _rolloverStuckTime = 0.0;
 
   // ------------------------------------------
   // FAHRZEUGSTEUERUNG
@@ -188,11 +218,24 @@ class PhysicsTestGame extends Forge2DGame {
 
     camera.viewfinder.position = Vector2(vehicleX + 5, vehicleY + 0.5);
 
+    // Nach einem Missionsfehlschlag bleibt die Kamera
+    // noch beim Fahrzeug, aber sämtliche Missions- und
+    // Fahrlogik wird beendet.
+    if (_missionFailed) {
+      return;
+    }
+
     _updateDrivePhysics(dt);
 
     _updateAirControl();
 
     _updateLandingDetection(dt);
+
+    _updateRolloverDetection(dt);
+
+    if (_missionFailed) {
+      return;
+    }
 
     _checkPickup(vehicleX);
 
@@ -370,7 +413,7 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    if (!_cargoPickedUp || _deliveryCompleted) {
+    if (!_cargoPickedUp || _deliveryCompleted || _missionFailed) {
       return;
     }
 
@@ -473,10 +516,107 @@ class PhysicsTestGame extends Forge2DGame {
   }
 
   // ------------------------------------------
+  // ÜBERSCHLAGSERKENNUNG
+  // ------------------------------------------
+
+  void _updateRolloverDetection(double dt) {
+    if (_deliveryCompleted || _missionFailed) {
+      _rolloverStuckTime = 0;
+
+      return;
+    }
+
+    // Während eines Sprungs darf der Timer nicht laufen.
+    //
+    // Dadurch kann der Spieler das Fahrzeug mit der
+    // Luftsteuerung drehen, ohne dass dies bereits als
+    // festliegender Überschlag gewertet wird.
+    if (_isVehicleAirborne()) {
+      _rolloverStuckTime = 0;
+
+      return;
+    }
+
+    final double tiltDegrees = _vehicleTiltDegrees();
+
+    final bool dangerouslyTilted = tiltDegrees >= _rolloverAngleDegrees;
+
+    if (!dangerouslyTilted) {
+      _rolloverStuckTime = 0;
+
+      return;
+    }
+
+    final Vector2 velocity = vehicle.body.linearVelocity;
+
+    final double linearSpeed = velocity.length;
+
+    // Solange das Fahrzeug noch deutlich in Bewegung
+    // ist, geben wir dem Spieler Zeit, die Situation
+    // selbst zu retten.
+    if (linearSpeed > _rolloverMaximumLinearSpeed) {
+      _rolloverStuckTime = 0;
+
+      return;
+    }
+
+    _rolloverStuckTime += dt;
+
+    if (_rolloverStuckTime < _rolloverFailureTime) {
+      return;
+    }
+
+    _failMission();
+  }
+
+  double _vehicleTiltDegrees() {
+    double angle = vehicle.body.angle;
+
+    // Winkel in den Bereich -PI bis +PI bringen.
+    while (angle > math.pi) {
+      angle -= math.pi * 2;
+    }
+
+    while (angle < -math.pi) {
+      angle += math.pi * 2;
+    }
+
+    final double absoluteAngle = angle.abs();
+
+    // 0°   = normal auf den Rädern
+    // 90°  = auf der Seite
+    // 180° = auf dem Dach
+    return absoluteAngle * 180 / math.pi;
+  }
+
+  void _failMission() {
+    if (_missionFailed || _deliveryCompleted) {
+      return;
+    }
+
+    _missionFailed = true;
+
+    _rolloverStuckTime = 0;
+
+    _throttle = 0;
+
+    rearWheelJoint.motorSpeed = 0;
+
+    // Das Fahrzeug darf physikalisch liegen bleiben.
+    // Wir stoppen lediglich den Antrieb und sämtliche
+    // Missionslogik.
+    onMissionFailed?.call();
+  }
+
+  // ------------------------------------------
   // ABHOLSTATION
   // ------------------------------------------
 
   void _checkPickup(double vehicleX) {
+    if (_missionFailed) {
+      return;
+    }
+
     if (_pickupStationReached || _cargoPickedUp) {
       return;
     }
@@ -499,6 +639,10 @@ class PhysicsTestGame extends Forge2DGame {
   }
 
   void completePickup() {
+    if (_missionFailed) {
+      return;
+    }
+
     if (!_pickupStationReached || _cargoPickedUp) {
       return;
     }
@@ -511,6 +655,8 @@ class PhysicsTestGame extends Forge2DGame {
     _wasAirborne = false;
     _airborneTime = 0;
     _maximumAirborneDownwardSpeed = 0;
+
+    _rolloverStuckTime = 0;
 
     _throttle = 0;
     rearWheelJoint.motorSpeed = 0;
@@ -529,6 +675,10 @@ class PhysicsTestGame extends Forge2DGame {
   // ------------------------------------------
 
   void _checkDelivery(double vehicleX) {
+    if (_missionFailed) {
+      return;
+    }
+
     if (!_cargoPickedUp) {
       return;
     }
@@ -555,7 +705,13 @@ class PhysicsTestGame extends Forge2DGame {
   }
 
   void _completeDelivery() {
+    if (_missionFailed || _deliveryCompleted) {
+      return;
+    }
+
     _deliveryCompleted = true;
+
+    _rolloverStuckTime = 0;
 
     vehicle.hideCargo();
 
@@ -609,6 +765,14 @@ class PhysicsTestGame extends Forge2DGame {
   // ------------------------------------------
 
   void setThrottle(double value) {
+    if (_missionFailed || _deliveryCompleted) {
+      _throttle = 0;
+
+      rearWheelJoint.motorSpeed = 0;
+
+      return;
+    }
+
     if (_pickupStationReached && !_cargoPickedUp) {
       _throttle = 0;
 

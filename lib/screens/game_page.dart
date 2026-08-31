@@ -33,6 +33,7 @@ class _GamePageState extends State<GamePage> {
 
   bool _showPickupOverlay = false;
   bool _showDeliveryCompleted = false;
+  bool _showMissionFailed = false;
 
   // Verhindert, dass der Missionsabschluss während
   // asynchroner Speicherzugriffe mehrfach ausgelöst wird.
@@ -105,7 +106,7 @@ class _GamePageState extends State<GamePage> {
       // ABHOLSTATION ERREICHT
       // ------------------------------------------
       onPickupStationReached: () {
-        if (!mounted) {
+        if (!mounted || _showMissionFailed) {
           return;
         }
 
@@ -122,7 +123,7 @@ class _GamePageState extends State<GamePage> {
       // LADUNG WURDE EINGELADEN
       // ------------------------------------------
       onCargoPickedUp: () {
-        if (!mounted) {
+        if (!mounted || _showMissionFailed) {
           return;
         }
 
@@ -145,7 +146,7 @@ class _GamePageState extends State<GamePage> {
       // LADUNGSZUSTAND HAT SICH VERÄNDERT
       // ------------------------------------------
       onCargoConditionChanged: (double conditionPercent) {
-        if (!mounted) {
+        if (!mounted || _showMissionFailed) {
           return;
         }
 
@@ -158,7 +159,18 @@ class _GamePageState extends State<GamePage> {
       // LIEFERUNG ABGESCHLOSSEN
       // ------------------------------------------
       onDeliveryCompleted: (int moneyReward, int xpReward) {
+        if (_showMissionFailed) {
+          return;
+        }
+
         _handleDeliveryCompleted(moneyReward, xpReward);
+      },
+
+      // ------------------------------------------
+      // MISSION FEHLGESCHLAGEN
+      // ------------------------------------------
+      onMissionFailed: () {
+        _handleMissionFailed();
       },
     );
   }
@@ -186,7 +198,10 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   void _startOrResumeMissionTimer() {
-    if (_showDeliveryCompleted || _showPickupOverlay || _missionTimerRunning) {
+    if (_showDeliveryCompleted ||
+        _showMissionFailed ||
+        _showPickupOverlay ||
+        _missionTimerRunning) {
       return;
     }
 
@@ -279,11 +294,53 @@ class _GamePageState extends State<GamePage> {
   }
 
   // ------------------------------------------
+  // MISSION FEHLGESCHLAGEN
+  // ------------------------------------------
+
+  void _handleMissionFailed() {
+    if (!mounted || _showMissionFailed || _showDeliveryCompleted) {
+      return;
+    }
+
+    _challengeTimer?.cancel();
+
+    _game.setThrottle(0);
+
+    _stopMissionTimer();
+
+    setState(() {
+      _showPickupOverlay = false;
+      _pickupChallengeRunning = false;
+      _pickupChallengeSolved = false;
+
+      _showMissionFailed = true;
+
+      _missionText = 'Auftrag fehlgeschlagen';
+      _missionIcon = Icons.warning_rounded;
+    });
+  }
+
+  // ------------------------------------------
+  // AUFTRAG WIEDERHOLEN
+  // ------------------------------------------
+
+  void _retryMission() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => GamePage(
+          progressController: widget.progressController,
+          mission: widget.mission,
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------
   // LIEFERUNG ABSCHLIESSEN
   // ------------------------------------------
 
   Future<void> _handleDeliveryCompleted(int moneyReward, int xpReward) async {
-    if (!mounted || _deliveryCompletionStarted) {
+    if (!mounted || _deliveryCompletionStarted || _showMissionFailed) {
       return;
     }
 
@@ -400,6 +457,10 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   void _quickLoadCargo() {
+    if (_showMissionFailed) {
+      return;
+    }
+
     _challengeTimer?.cancel();
 
     _pickupBonusMoney = 0;
@@ -414,7 +475,7 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   void _startPackageChallenge() {
-    if (_pickupChallengeRunning) {
+    if (_pickupChallengeRunning || _showMissionFailed) {
       return;
     }
 
@@ -447,7 +508,7 @@ class _GamePageState extends State<GamePage> {
     _challengeStartedAt = DateTime.now();
 
     _challengeTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted || _challengeStartedAt == null) {
+      if (!mounted || _challengeStartedAt == null || _showMissionFailed) {
         return;
       }
 
@@ -465,7 +526,9 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   Future<void> _selectPackage(int packageNumber) async {
-    if (!_pickupChallengeRunning || _pickupChallengeSolved) {
+    if (!_pickupChallengeRunning ||
+        _pickupChallengeSolved ||
+        _showMissionFailed) {
       return;
     }
 
@@ -497,7 +560,7 @@ class _GamePageState extends State<GamePage> {
       bonusXp = 0;
     }
 
-    if (!mounted) {
+    if (!mounted || _showMissionFailed) {
       return;
     }
 
@@ -513,7 +576,7 @@ class _GamePageState extends State<GamePage> {
 
     await Future<void>.delayed(const Duration(milliseconds: 1100));
 
-    if (!mounted) {
+    if (!mounted || _showMissionFailed) {
       return;
     }
 
@@ -561,7 +624,7 @@ class _GamePageState extends State<GamePage> {
   // ------------------------------------------
 
   void _startGas() {
-    if (_showPickupOverlay || _showDeliveryCompleted) {
+    if (_showPickupOverlay || _showDeliveryCompleted || _showMissionFailed) {
       return;
     }
 
@@ -570,7 +633,7 @@ class _GamePageState extends State<GamePage> {
   }
 
   void _startReverse() {
-    if (_showPickupOverlay || _showDeliveryCompleted) {
+    if (_showPickupOverlay || _showDeliveryCompleted || _showMissionFailed) {
       return;
     }
 
@@ -600,7 +663,7 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // ZURÜCK
           // ------------------------------------------
-          if (!_showDeliveryCompleted)
+          if (!_showDeliveryCompleted && !_showMissionFailed)
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -619,7 +682,7 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // GELD, XP, ZEIT UND LADUNG
           // ------------------------------------------
-          if (!_showDeliveryCompleted)
+          if (!_showDeliveryCompleted && !_showMissionFailed)
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -659,7 +722,7 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // MISSIONSZIEL
           // ------------------------------------------
-          if (!_showDeliveryCompleted)
+          if (!_showDeliveryCompleted && !_showMissionFailed)
             SafeArea(
               child: Align(
                 alignment: Alignment.topCenter,
@@ -711,7 +774,7 @@ class _GamePageState extends State<GamePage> {
           // ------------------------------------------
           // ABHOLSTATION
           // ------------------------------------------
-          if (_showPickupOverlay)
+          if (_showPickupOverlay && !_showMissionFailed)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withValues(alpha: 0.55),
@@ -815,9 +878,45 @@ class _GamePageState extends State<GamePage> {
             ),
 
           // ------------------------------------------
+          // MISSION FEHLGESCHLAGEN
+          // ------------------------------------------
+          if (_showMissionFailed)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.72),
+                child: SafeArea(
+                  child: Center(
+                    child: Container(
+                      width: 520,
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      margin: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.all(26),
+                      decoration: BoxDecoration(
+                        color: const Color(0xF2292020),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: const Color(0xFFE06A5F),
+                          width: 2,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black54,
+                            blurRadius: 20,
+                            offset: Offset(0, 7),
+                          ),
+                        ],
+                      ),
+                      child: _buildMissionFailedOverlay(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // ------------------------------------------
           // STEUERUNG
           // ------------------------------------------
-          if (!_showDeliveryCompleted)
+          if (!_showDeliveryCompleted && !_showMissionFailed)
             Positioned(
               left: 30,
               bottom: 25,
@@ -829,7 +928,7 @@ class _GamePageState extends State<GamePage> {
               ),
             ),
 
-          if (!_showDeliveryCompleted)
+          if (!_showDeliveryCompleted && !_showMissionFailed)
             Positioned(
               right: 30,
               bottom: 25,
@@ -842,6 +941,121 @@ class _GamePageState extends State<GamePage> {
             ),
         ],
       ),
+    );
+  }
+
+  // ------------------------------------------
+  // MISSION FEHLGESCHLAGEN – OVERLAY
+  // ------------------------------------------
+
+  Widget _buildMissionFailedOverlay() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.car_crash_rounded, color: Color(0xFFFF746B), size: 52),
+
+        const SizedBox(height: 10),
+
+        const Text(
+          'AUFTRAG FEHLGESCHLAGEN',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.7,
+          ),
+        ),
+
+        const SizedBox(height: 7),
+
+        const Text(
+          'Fahrzeug nicht mehr fahrbereit',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 5),
+
+        Text(
+          'Missionszeit: ${_formatMissionTime(_missionSeconds)}',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+
+        const SizedBox(height: 22),
+
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _retryMission,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFE06A5F),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(0, 48),
+            ),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text(
+              'AUFTRAG WIEDERHOLEN',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.3),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _goToMissionSelection,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white38),
+              minimumSize: const Size(0, 46),
+            ),
+            icon: const Icon(Icons.assignment_rounded),
+            label: const Text(
+              'MISSIONEN',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.3),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _goToMainMenu,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white70,
+              side: const BorderSide(color: Colors.white24),
+              minimumSize: const Size(0, 46),
+            ),
+            icon: const Icon(Icons.home_rounded),
+            label: const Text(
+              'HAUPTMENÜ',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.3),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        const Text(
+          'Keine Belohnung • Keine XP • Keine Sterne',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white38,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 
@@ -890,9 +1104,6 @@ class _GamePageState extends State<GamePage> {
 
           const SizedBox(height: 7),
 
-          // ------------------------------------------
-          // BEWERTUNG
-          // ------------------------------------------
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -995,9 +1206,6 @@ class _GamePageState extends State<GamePage> {
 
           const SizedBox(height: 6),
 
-          // ------------------------------------------
-          // BESTLEISTUNG
-          // ------------------------------------------
           if (_savedBestTime != null && _savedBestStars != null)
             Container(
               width: double.infinity,
@@ -1037,9 +1245,6 @@ class _GamePageState extends State<GamePage> {
 
           const SizedBox(height: 6),
 
-          // ------------------------------------------
-          // BELOHNUNG
-          // ------------------------------------------
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

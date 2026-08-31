@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +13,7 @@ class PhysicsTestGame extends Forge2DGame {
     required this.mission,
     this.onPickupStationReached,
     this.onCargoPickedUp,
+    this.onCargoConditionChanged,
     this.onDeliveryCompleted,
   }) : super(
          gravity: Vector2(0, 9.81),
@@ -22,6 +25,8 @@ class PhysicsTestGame extends Forge2DGame {
 
   final VoidCallback? onPickupStationReached;
   final VoidCallback? onCargoPickedUp;
+
+  final void Function(double cargoConditionPercent)? onCargoConditionChanged;
 
   final void Function(int moneyReward, int xpReward)? onDeliveryCompleted;
 
@@ -36,7 +41,44 @@ class PhysicsTestGame extends Forge2DGame {
   bool _cargoPickedUp = false;
   bool _deliveryCompleted = false;
 
+  // Wird von GamePage für die Ladungsanzeige verwendet.
+  bool get cargoPickedUp => _cargoPickedUp;
+
   double _throttle = 0;
+
+  // ------------------------------------------
+  // LADUNGSZUSTAND / LANDUNGEN
+  // ------------------------------------------
+
+  double _cargoConditionPercent = 100.0;
+
+  bool _wasAirborne = false;
+
+  double _maximumAirborneDownwardSpeed = 0.0;
+
+  // Verhindert, dass winzige Bodenwellen als
+  // echte Sprünge erkannt werden.
+  double _airborneTime = 0.0;
+
+  static const double _minimumAirborneTimeForLanding = 0.18;
+
+  // Abstand zwischen Reifenunterkante und Terrain,
+  // ab dem ein Rad als nicht mehr auf dem Boden gilt.
+  static const double _airborneGroundClearance = 0.12;
+
+  // Landungsschwellen.
+  //
+  // Unter 4.5 m/s = normale Landung
+  // 4.5–6.0 m/s   = leichte harte Landung
+  // 6.0–8.0 m/s   = harte Landung
+  // über 8.0 m/s   = sehr harte Landung
+  static const double _lightLandingSpeed = 4.5;
+  static const double _hardLandingSpeed = 6.0;
+  static const double _extremeLandingSpeed = 8.0;
+
+  // ------------------------------------------
+  // FAHRZEUGSTEUERUNG
+  // ------------------------------------------
 
   static const double _motorSpeed = 26;
   static const double _motorTorque = 60;
@@ -55,24 +97,8 @@ class PhysicsTestGame extends Forge2DGame {
   // LUFTSTEUERUNG
   // ------------------------------------------
 
-  // Drehmoment, mit dem der Spieler das Fahrzeug
-  // während eines Sprungs beeinflussen kann.
-  //
-  // Der Wert ist bewusst begrenzt, damit die
-  // Luftsteuerung hilfreich bleibt, ohne dass sich
-  // der Pickup unnatürlich schnell drehen lässt.
   static const double _airControlTorque = 32.0;
-
-  // Maximale Drehgeschwindigkeit des Fahrzeugs
-  // während der aktiven Luftsteuerung.
   static const double _maxAirAngularVelocity = 3.4;
-
-  // Mindestabstand der Räder zum Terrain, ab dem
-  // das Fahrzeug als wirklich in der Luft gilt.
-  //
-  // Dadurch wird verhindert, dass die Luftsteuerung
-  // bereits bei kleinen Bodenwellen eingreift.
-  static const double _airborneGroundClearance = 0.12;
 
   // ------------------------------------------
   // ZIELBEREICH
@@ -81,9 +107,10 @@ class PhysicsTestGame extends Forge2DGame {
   static const double _deliveryDestinationX = 292.0;
   static const double _deliveryGroundY = 8.0;
 
-  // Lieferzone direkt vor dem Gebäude.
-  // Mittelpunkt: x = 289
-  // Bereich:     x = 287 bis 291
+  // Gebäude: x = 292
+  //
+  // Lieferzone:
+  // x = 287 bis x = 291
   static const double _deliveryZoneCenterX = 289.0;
   static const double _deliveryZoneHalfWidth = 2.0;
 
@@ -157,7 +184,6 @@ class PhysicsTestGame extends Forge2DGame {
     }
 
     final double vehicleX = vehicle.body.position.x;
-
     final double vehicleY = vehicle.body.position.y;
 
     camera.viewfinder.position = Vector2(vehicleX + 5, vehicleY + 0.5);
@@ -166,17 +192,19 @@ class PhysicsTestGame extends Forge2DGame {
 
     _updateAirControl();
 
+    _updateLandingDetection(dt);
+
     _checkPickup(vehicleX);
 
     _checkDelivery(vehicleX);
   }
 
+  // ------------------------------------------
+  // FAHRPHYSIK
+  // ------------------------------------------
+
   void _updateDrivePhysics(double dt) {
     final double horizontalSpeed = vehicle.body.linearVelocity.x;
-
-    // ------------------------------------------
-    // KEIN PEDAL
-    // ------------------------------------------
 
     if (_throttle == 0) {
       rearWheelJoint.motorSpeed = 0;
@@ -185,10 +213,6 @@ class PhysicsTestGame extends Forge2DGame {
 
       return;
     }
-
-    // ------------------------------------------
-    // GAS / VORWÄRTS
-    // ------------------------------------------
 
     if (_throttle > 0) {
       if (horizontalSpeed < -_directionChangeSpeed) {
@@ -203,10 +227,6 @@ class PhysicsTestGame extends Forge2DGame {
 
       return;
     }
-
-    // ------------------------------------------
-    // RÜCKWÄRTS / BREMSE
-    // ------------------------------------------
 
     if (_throttle < 0) {
       if (horizontalSpeed > _directionChangeSpeed) {
@@ -266,12 +286,8 @@ class PhysicsTestGame extends Forge2DGame {
 
     final double angularVelocity = vehicle.body.angularVelocity;
 
-    // ------------------------------------------
-    // GAS
-    //
-    // Nase nach oben / Fahrzeug nach hinten drehen.
-    // ------------------------------------------
-
+    // GAS:
+    // Nase nach oben.
     if (_throttle > 0) {
       if (angularVelocity <= -_maxAirAngularVelocity) {
         return;
@@ -282,12 +298,8 @@ class PhysicsTestGame extends Forge2DGame {
       return;
     }
 
-    // ------------------------------------------
-    // RÜCKWÄRTS / BREMSE
-    //
-    // Nase nach unten / Fahrzeug nach vorne drehen.
-    // ------------------------------------------
-
+    // RÜCKWÄRTS / BREMSE:
+    // Nase nach unten.
     if (_throttle < 0) {
       if (angularVelocity >= _maxAirAngularVelocity) {
         return;
@@ -299,19 +311,165 @@ class PhysicsTestGame extends Forge2DGame {
 
   bool _isVehicleAirborne() {
     final Vector2 rearPosition = rearWheel.body.position;
+
     final Vector2 frontPosition = frontWheel.body.position;
 
     final double rearGroundY = PhysicsTerrain.getTerrainY(rearPosition.x);
+
     final double frontGroundY = PhysicsTerrain.getTerrainY(frontPosition.x);
 
     final double rearWheelBottom = rearPosition.y + rearWheel.radius;
+
     final double frontWheelBottom = frontPosition.y + frontWheel.radius;
 
     final double rearClearance = rearGroundY - rearWheelBottom;
+
     final double frontClearance = frontGroundY - frontWheelBottom;
 
     return rearClearance > _airborneGroundClearance &&
         frontClearance > _airborneGroundClearance;
+  }
+
+  // ------------------------------------------
+  // LANDUNGSERKENNUNG
+  // ------------------------------------------
+
+  void _updateLandingDetection(double dt) {
+    final bool airborne = _isVehicleAirborne();
+
+    if (airborne) {
+      _airborneTime += dt;
+
+      final double downwardSpeed = vehicle.body.linearVelocity.y;
+
+      if (downwardSpeed > _maximumAirborneDownwardSpeed) {
+        _maximumAirborneDownwardSpeed = downwardSpeed;
+      }
+
+      _wasAirborne = true;
+
+      return;
+    }
+
+    if (!_wasAirborne) {
+      _airborneTime = 0;
+      _maximumAirborneDownwardSpeed = 0;
+
+      return;
+    }
+
+    final double airborneTime = _airborneTime;
+
+    final double impactSpeed = _maximumAirborneDownwardSpeed;
+
+    _wasAirborne = false;
+    _airborneTime = 0;
+    _maximumAirborneDownwardSpeed = 0;
+
+    if (airborneTime < _minimumAirborneTimeForLanding) {
+      return;
+    }
+
+    if (!_cargoPickedUp || _deliveryCompleted) {
+      return;
+    }
+
+    _handleLanding(impactSpeed);
+  }
+
+  void _handleLanding(double impactSpeed) {
+    if (impactSpeed < _lightLandingSpeed) {
+      return;
+    }
+
+    double baseDamage;
+
+    if (impactSpeed < _hardLandingSpeed) {
+      baseDamage = 3.0;
+    } else if (impactSpeed < _extremeLandingSpeed) {
+      baseDamage = 8.0;
+    } else {
+      // Je stärker der Aufprall über 8 m/s,
+      // desto größer der Schaden.
+      //
+      // Beispiel:
+      // 8 m/s  ≈ 15 %
+      // 10 m/s ≈ 21 %
+      // 12 m/s ≈ 27 %
+      baseDamage = 15.0 + ((impactSpeed - _extremeLandingSpeed) * 3.0);
+    }
+
+    final double angleDamage = _calculateLandingAngleDamage();
+
+    final double cargoMultiplier = _cargoDamageMultiplier(mission.cargoType);
+
+    final double totalDamage = (baseDamage + angleDamage) * cargoMultiplier;
+
+    _applyCargoDamage(totalDamage);
+  }
+
+  double _calculateLandingAngleDamage() {
+    double angle = vehicle.body.angle.abs();
+
+    while (angle > math.pi) {
+      angle -= math.pi * 2;
+      angle = angle.abs();
+    }
+
+    if (angle > math.pi / 2) {
+      angle = math.pi - angle;
+    }
+
+    final double degrees = angle * 180 / math.pi;
+
+    if (degrees < 12) {
+      return 0;
+    }
+
+    if (degrees < 25) {
+      return 2;
+    }
+
+    if (degrees < 40) {
+      return 5;
+    }
+
+    return 9;
+  }
+
+  double _cargoDamageMultiplier(CargoType cargoType) {
+    switch (cargoType) {
+      case CargoType.parcel:
+        return 1.0;
+
+      case CargoType.food:
+        return 1.1;
+
+      case CargoType.buildingMaterials:
+        return 0.65;
+
+      case CargoType.vehicleParts:
+        return 1.35;
+    }
+  }
+
+  void _applyCargoDamage(double damage) {
+    if (damage <= 0) {
+      return;
+    }
+
+    final double newCondition = (_cargoConditionPercent - damage).clamp(
+      0.0,
+      100.0,
+    );
+
+    if (newCondition == _cargoConditionPercent) {
+      return;
+    }
+
+    _cargoConditionPercent = newCondition;
+
+    onCargoConditionChanged?.call(_cargoConditionPercent);
   }
 
   // ------------------------------------------
@@ -348,10 +506,18 @@ class PhysicsTestGame extends Forge2DGame {
     _cargoPickedUp = true;
     _pickupStationReached = false;
 
+    _cargoConditionPercent = 100.0;
+
+    _wasAirborne = false;
+    _airborneTime = 0;
+    _maximumAirborneDownwardSpeed = 0;
+
     _throttle = 0;
     rearWheelJoint.motorSpeed = 0;
 
     vehicle.showCargo();
+
+    onCargoConditionChanged?.call(_cargoConditionPercent);
 
     onCargoPickedUp?.call();
 
@@ -524,16 +690,6 @@ abstract class DeliveryDestination extends PositionComponent {
   }
 
   void drawDeliveryZone(Canvas canvas) {
-    // Gebäude: x = 292
-    //
-    // Sichtbare Zone relativ zum Gebäude:
-    // -5 bis -1
-    //
-    // Absolut:
-    // x = 287 bis x = 291
-    //
-    // Das stimmt exakt mit dem
-    // physikalischen Trigger überein.
     const Rect zone = Rect.fromLTWH(-5.0, -0.18, 4.0, 0.30);
 
     canvas.drawRRect(
@@ -988,7 +1144,6 @@ class PhysicsTerrain extends BodyComponent {
     ..strokeJoin = StrokeJoin.round;
 
   static final List<Vector2> _controlPoints = [
-    // START / DEPOT
     Vector2(-10, 8.0),
     Vector2(0, 8.0),
     Vector2(8, 8.0),
@@ -997,7 +1152,6 @@ class PhysicsTerrain extends BodyComponent {
     Vector2(23, 7.9),
     Vector2(28, 8.1),
 
-    // NATÜRLICHER EINSTIEG
     Vector2(34, 7.7),
     Vector2(40, 6.9),
     Vector2(46, 6.2),
@@ -1005,7 +1159,6 @@ class PhysicsTerrain extends BodyComponent {
     Vector2(58, 7.4),
     Vector2(64, 8.1),
 
-    // SPRUNG 1
     Vector2(68, 7.7),
     Vector2(71, 6.8),
     Vector2(74, 5.7),
@@ -1016,14 +1169,12 @@ class PhysicsTerrain extends BodyComponent {
     Vector2(88, 7.8),
     Vector2(92, 8.7),
 
-    // LANGES TAL
     Vector2(98, 9.1),
     Vector2(104, 8.8),
     Vector2(110, 7.9),
     Vector2(116, 6.8),
     Vector2(122, 5.8),
 
-    // SPRUNG 2
     Vector2(128, 4.9),
     Vector2(133, 4.2),
     Vector2(137, 3.9),
@@ -1034,12 +1185,10 @@ class PhysicsTerrain extends BodyComponent {
     Vector2(152, 8.5),
     Vector2(157, 9.6),
 
-    // ERHOLUNGSABSCHNITT
     Vector2(162, 9.8),
     Vector2(167, 9.1),
     Vector2(172, 8.1),
 
-    // SPRUNG 3 / TECHNISCHER BEREICH
     Vector2(176, 7.0),
     Vector2(179, 5.8),
     Vector2(182, 5.0),
@@ -1055,13 +1204,11 @@ class PhysicsTerrain extends BodyComponent {
     Vector2(210, 8.6),
     Vector2(215, 9.4),
 
-    // KLEINE OFFROAD-WELLEN
     Vector2(220, 8.8),
     Vector2(224, 7.6),
     Vector2(228, 8.2),
     Vector2(232, 7.4),
 
-    // SPRUNG 4
     Vector2(236, 6.4),
     Vector2(240, 5.1),
     Vector2(244, 3.9),
@@ -1074,12 +1221,10 @@ class PhysicsTerrain extends BodyComponent {
     Vector2(264, 7.8),
     Vector2(268, 9.2),
 
-    // SANFTER AUSLAUF
     Vector2(272, 9.2),
     Vector2(274, 8.7),
     Vector2(276, 8.3),
 
-    // KOMPLETT EBENER ZIELBEREICH
     Vector2(278, 8.0),
     Vector2(280, 8.0),
     Vector2(284, 8.0),
@@ -1163,6 +1308,7 @@ class PhysicsTerrain extends BodyComponent {
 
     for (int i = 0; i < _points.length - 1; i++) {
       final Vector2 start = _points[i];
+
       final Vector2 end = _points[i + 1];
 
       if (x >= start.x && x <= end.x) {

@@ -79,15 +79,57 @@ class PhysicsVehicle extends BodyComponent {
 
     final Body vehicleBody = world.createBody(bodyDef);
 
-    final Polygon bodyShape = Polygon.box(
+    // ------------------------------------------
+    // UNTERE KAROSSERIE
+    // ------------------------------------------
+    //
+    // Diese Kollisionsform entspricht weiterhin
+    // dem unteren Fahrzeugkörper.
+    final Polygon lowerBodyShape = Polygon.box(
       bodyWidth / 2,
       bodyHeight / 2,
       radius: 0.08,
     );
 
-    final ShapeDef shapeDef = ShapeDef(density: 1.8);
+    final ShapeDef lowerBodyShapeDef = ShapeDef(density: 1.8);
 
-    vehicleBody.createShape(bodyShape, shapeDef);
+    vehicleBody.createShape(lowerBodyShape, lowerBodyShapeDef);
+
+    // ------------------------------------------
+    // FAHRERKABINE / DACH
+    // ------------------------------------------
+    //
+    // Die sichtbare Kabine reicht bis ungefähr
+    // y = -1.60.
+    //
+    // Die bisherige Physikform endete bereits bei
+    // ungefähr y = -0.475. Dadurch konnte das Dach
+    // bei einem Überschlag optisch im Boden hängen.
+    //
+    // Diese zusätzliche Form folgt grob der
+    // sichtbaren Kabinensilhouette:
+    //
+    // hinten unten  -> (-0.48, -0.45)
+    // hinten oben   -> (-0.10, -1.58)
+    // Dach vorne    -> ( 0.95, -1.58)
+    // vorne unten   -> ( 1.56, -0.45)
+    //
+    // Dadurch kann das Fahrzeug jetzt tatsächlich
+    // auf dem Dach bzw. der Kabine aufliegen.
+    final Polygon cabinShape = Polygon([
+      Vector2(-0.48, -0.45),
+      Vector2(-0.10, -1.58),
+      Vector2(0.95, -1.58),
+      Vector2(1.56, -0.45),
+    ], radius: 0.06);
+
+    // Die Kabinenform bekommt eine etwas geringere
+    // Dichte als der massive untere Fahrzeugkörper.
+    // Dadurch verändert sich Schwerpunkt/Fahrverhalten
+    // weniger stark als bei einer zweiten schweren Box.
+    final ShapeDef cabinShapeDef = ShapeDef(density: 0.65);
+
+    vehicleBody.createShape(cabinShape, cabinShapeDef);
 
     return vehicleBody;
   }

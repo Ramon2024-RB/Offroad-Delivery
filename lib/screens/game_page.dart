@@ -63,10 +63,10 @@ class _GamePageState extends State<GamePage> {
   int _cargoConditionStars = 0;
   int _missionTotalStars = 0;
 
-  // Noch testweise 100 %.
+  // Aktueller Zustand der transportierten Ladung.
   //
-  // Im nächsten Schritt wird dieser Wert durch
-  // harte Landungen und Kollisionen verändert.
+  // Start: 100 %
+  // Harte Landungen reduzieren diesen Wert.
   double _cargoConditionPercent = 100.0;
 
   // ------------------------------------------
@@ -131,11 +131,26 @@ class _GamePageState extends State<GamePage> {
           _pickupChallengeRunning = false;
           _pickupChallengeSolved = false;
 
+          _cargoConditionPercent = 100.0;
+
           _missionText =
               '${_cargoName(widget.mission.cargoType)} geladen – '
               'fahre zum ${_destinationName(widget.mission.destinationType)}';
 
           _missionIcon = Icons.local_shipping_rounded;
+        });
+      },
+
+      // ------------------------------------------
+      // LADUNGSZUSTAND HAT SICH VERÄNDERT
+      // ------------------------------------------
+      onCargoConditionChanged: (double conditionPercent) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _cargoConditionPercent = conditionPercent;
         });
       },
 
@@ -602,7 +617,7 @@ class _GamePageState extends State<GamePage> {
             ),
 
           // ------------------------------------------
-          // GELD, XP UND ZEIT
+          // GELD, XP, ZEIT UND LADUNG
           // ------------------------------------------
           if (!_showDeliveryCompleted)
             SafeArea(
@@ -617,12 +632,23 @@ class _GamePageState extends State<GamePage> {
                         icon: Icons.timer_outlined,
                         value: _formatMissionTime(_missionSeconds),
                       ),
+
+                      if (_game.cargoPickedUp) ...[
+                        const SizedBox(width: 8),
+                        _CargoHudValue(
+                          conditionPercent: _cargoConditionPercent,
+                        ),
+                      ],
+
                       const SizedBox(width: 8),
+
                       _HudValue(
                         icon: Icons.monetization_on_rounded,
                         value: '$money',
                       ),
+
                       const SizedBox(width: 8),
+
                       _HudValue(icon: Icons.star_rounded, value: '$xp XP'),
                     ],
                   ),
@@ -640,8 +666,8 @@ class _GamePageState extends State<GamePage> {
                 child: Padding(
                   padding: const EdgeInsets.only(
                     top: 12,
-                    left: 190,
-                    right: 260,
+                    left: 120,
+                    right: 460,
                   ),
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 460),
@@ -1550,6 +1576,63 @@ class _HudValue extends StatelessWidget {
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ----------------------------------------------------
+// LADUNGS-HUD
+// ----------------------------------------------------
+
+class _CargoHudValue extends StatelessWidget {
+  const _CargoHudValue({required this.conditionPercent});
+
+  final double conditionPercent;
+
+  Color _conditionColor() {
+    if (conditionPercent >= 90) {
+      return const Color(0xFF7DDB83);
+    }
+
+    if (conditionPercent >= 70) {
+      return const Color(0xFFFFD866);
+    }
+
+    if (conditionPercent >= 40) {
+      return const Color(0xFFFFA94D);
+    }
+
+    return const Color(0xFFFF6B6B);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color conditionColor = _conditionColor();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: conditionColor.withValues(alpha: 0.55)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.inventory_2_rounded, size: 19, color: conditionColor),
+
+          const SizedBox(width: 6),
+
+          Text(
+            '${conditionPercent.toStringAsFixed(0)} %',
+            style: TextStyle(
+              color: conditionColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],

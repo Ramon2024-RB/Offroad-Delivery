@@ -29,8 +29,10 @@ class MissionCatalog {
     DeliveryMission(
       id: 'food_mountain_hut_01',
       title: 'Vorräte zur Berghütte',
-      description: 'Bringe Lebensmittel über schwierigeres Gelände zu einer abgelegenen Berghütte.',
-      routeId: 'route_01',
+      description:
+          'Bringe Lebensmittel über schwierigeres Gelände zu einer '
+          'abgelegenen Berghütte.',
+      routeId: 'route_02',
       cargoType: CargoType.food,
       destinationType: DestinationType.mountainHut,
       difficulty: MissionDifficulty.medium,
@@ -71,7 +73,9 @@ class MissionCatalog {
     DeliveryMission(
       id: 'vehicle_parts_workshop_01',
       title: 'Ersatzteile zur Werkstatt',
-      description: 'Liefere empfindliche Fahrzeugteile schnell und möglichst unbeschädigt zu einer abgelegenen Werkstatt.',
+      description:
+          'Liefere empfindliche Fahrzeugteile schnell und möglichst '
+          'unbeschädigt zu einer abgelegenen Werkstatt.',
       routeId: 'route_01',
       cargoType: CargoType.vehicleParts,
       destinationType: DestinationType.workshop,

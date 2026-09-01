@@ -173,6 +173,17 @@ class PhysicsTestGame extends Forge2DGame {
   static const double _rearWheelX = -1.45;
   static const double _frontWheelX = 1.45;
   static const double _wheelY = 1.0;
+  static const double _wheelRadius = 0.48;
+
+  // ------------------------------------------
+  // STABILITÄT / FAHRWERK
+  // ------------------------------------------
+
+  static const double _spawnGroundClearance = 0.08;
+
+  static const double _suspensionHertz = 3.4;
+  static const double _suspensionDampingRatio = 0.90;
+  static const double _suspensionTravel = 0.30;
 
   // ------------------------------------------
   // LUFTSTEUERUNG
@@ -202,24 +213,35 @@ class PhysicsTestGame extends Forge2DGame {
 
     final PositionComponent deliveryDestination = _createDeliveryDestination();
 
-    final Vector2 startPosition = route.vehicleStartPosition;
+    final double startX = route.vehicleStartPosition.x;
+
+    final double rearGroundY = terrain.getTerrainY(startX + _rearWheelX);
+
+    final double frontGroundY = terrain.getTerrainY(startX + _frontWheelX);
+
+    // Y wächst in unserem Spiel nach unten.
+    // Deshalb ist der kleinere Y-Wert der höhere Bodenpunkt.
+    // Wir richten beide Räder daran aus, damit keines beim
+    // Start bereits im Terrain steckt.
+    final double highestGroundY = math.min(rearGroundY, frontGroundY);
+
+    final double wheelStartY =
+        highestGroundY - _wheelRadius - _spawnGroundClearance;
+
+    final double vehicleStartY = wheelStartY - _wheelY;
+
+    final Vector2 startPosition = Vector2(startX, vehicleStartY);
 
     vehicle = PhysicsVehicle(
       startPosition: Vector2(startPosition.x, startPosition.y),
     );
 
     rearWheel = PhysicsWheel(
-      startPosition: Vector2(
-        startPosition.x + _rearWheelX,
-        startPosition.y + _wheelY,
-      ),
+      startPosition: Vector2(startPosition.x + _rearWheelX, wheelStartY),
     );
 
     frontWheel = PhysicsWheel(
-      startPosition: Vector2(
-        startPosition.x + _frontWheelX,
-        startPosition.y + _wheelY,
-      ),
+      startPosition: Vector2(startPosition.x + _frontWheelX, wheelStartY),
     );
 
     await world.add(landscape);
@@ -760,6 +782,22 @@ class PhysicsTestGame extends Forge2DGame {
     _deliveryCompleted = true;
 
     _rolloverStuckTime = 0;
+    _throttle = 0;
+
+    // Motor sofort abschalten.
+    rearWheelJoint.motorSpeed = 0;
+
+    // Restbewegung vor dem Ergebnisbildschirm beruhigen.
+    // Dadurch kann das Fahrwerk in den letzten Frames
+    // keinen sichtbaren Physik-Kick mehr erzeugen.
+    vehicle.body.linearVelocity = Vector2.zero();
+    vehicle.body.angularVelocity = 0;
+
+    rearWheel.body.linearVelocity = Vector2.zero();
+    rearWheel.body.angularVelocity = 0;
+
+    frontWheel.body.linearVelocity = Vector2.zero();
+    frontWheel.body.angularVelocity = 0;
 
     vehicle.hideCargo();
 
@@ -778,11 +816,11 @@ class PhysicsTestGame extends Forge2DGame {
       localAnchorB: Vector2.zero(),
       localAxisA: Vector2(0, 1),
       enableSpring: true,
-      hertz: 4.5,
-      dampingRatio: 0.75,
+      hertz: _suspensionHertz,
+      dampingRatio: _suspensionDampingRatio,
       enableLimit: true,
-      lowerTranslation: -0.35,
-      upperTranslation: 0.35,
+      lowerTranslation: -_suspensionTravel,
+      upperTranslation: _suspensionTravel,
       enableMotor: true,
       maxMotorTorque: _motorTorque,
       motorSpeed: 0,
@@ -795,11 +833,11 @@ class PhysicsTestGame extends Forge2DGame {
       localAnchorB: Vector2.zero(),
       localAxisA: Vector2(0, 1),
       enableSpring: true,
-      hertz: 4.5,
-      dampingRatio: 0.75,
+      hertz: _suspensionHertz,
+      dampingRatio: _suspensionDampingRatio,
       enableLimit: true,
-      lowerTranslation: -0.35,
-      upperTranslation: 0.35,
+      lowerTranslation: -_suspensionTravel,
+      upperTranslation: _suspensionTravel,
       enableMotor: false,
     );
 
